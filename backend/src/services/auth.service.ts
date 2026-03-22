@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 export const loginService = async (email: string, password: string) => {
 
-    const user = await userModel.findOne({ email });
+    const user = await userModel.findOne({ email }).select("+password");
     if (!user) {
         return { message: "User not found" };
     }
@@ -12,7 +12,16 @@ export const loginService = async (email: string, password: string) => {
     if (!isPasswordValid) {
         return { message: "Invalid password" };
     }
-    const accessToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" });
+    const accessToken = jwt.sign(
+        {
+            _id: user._id,
+            sub: String(user._id),
+            role: user.role,
+            name: user.name,
+        },
+        process.env.JWT_SECRET_ACCESS_TOKEN!,
+        { expiresIn: "7d" },
+    );
     const refreshToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET_REFRESH_TOKEN!, { expiresIn: "7d" });
     user.refreshToken = refreshToken;
     await user.save();
