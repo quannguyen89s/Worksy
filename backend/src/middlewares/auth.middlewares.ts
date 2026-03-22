@@ -135,4 +135,31 @@ const resendVerifyEmailValidator = checkSchema({
 
 export const resendVerifyEmailMiddleware = validate(resendVerifyEmailValidator);
 
+const forgotPasswordValidator = checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+}, ["body"]);
+
+export const forgotPasswordMiddleware = validate(forgotPasswordValidator);
+
+const verifyForgotPasswordTokenValidator = checkSchema({
+    forgotPasswordToken: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.FORGOT_PASSWORD_TOKEN_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.FORGOT_PASSWORD_TOKEN_MUST_BE_STRING,
+        },
+        trim: true,
+    },
+}, ["body"]);
+
+export const verifyForgotPasswordTokenMiddleware = validate(verifyForgotPasswordTokenValidator);
 

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
-import { sendVerifyEmail } from "./email.service";
+import { sendVerifyEmail, sendForgotPasswordEmail } from "./email.service";
 
 const signAccessToken = (userId: string) => {
     return new Promise<string>((resolve, reject) => {
@@ -26,6 +26,15 @@ const signRefreshToken = (userId: string) => {
 const signEmailVerifyToken = (userId: string) => {
     return new Promise<string>((resolve, reject) => {
         jwt.sign({ _id: userId }, process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN!, { expiresIn: "1d" }, (err, token) => {
+            if (err) reject(err);
+            resolve(token as string);
+        });
+    });
+}
+
+const signForgotPasswordToken = (userId: string) => {
+    return new Promise<string>((resolve, reject) => {
+        jwt.sign({ _id: userId }, process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN!, { expiresIn: "1h" }, (err, token) => {
             if (err) reject(err);
             resolve(token as string);
         });
@@ -108,4 +117,32 @@ export const resendVerifyEmailService = async (email: string) => {
     await sendVerifyEmail(email, emailVerifyToken);
 
     return { message: USER_MESSAGE.RESEND_VERIFY_EMAIL_SUCCESSFUL, emailVerifyToken };
+}
+
+export const forgotPasswordService = async (email: string) => {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+        return { message: USER_MESSAGE.USER_NOT_FOUND };
+    }
+
+    const forgotPasswordToken = await signForgotPasswordToken(user._id.toString());
+    await userModel.updateOne({ _id: user._id }, { forgotPasswordToken });
+
+    await sendForgotPasswordEmail(email, forgotPasswordToken);
+
+    return { message: USER_MESSAGE.FORGOT_PASSWORD_EMAIL_SENT, forgotPasswordToken };
+}
+
+export const verifyForgotPasswordTokenService = async (forgotPasswordToken: string) => {
+    const decoded = jwt.verify(forgotPasswordToken, process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN!) as { _id: string };
+
+    const user = await userModel.findById(decoded._id);
+    if (!user) {
+        return { message: USER_MESSAGE.USER_NOT_FOUND };
+    }
+    if (user.forgotPasswordToken !== forgotPasswordToken) {
+        return { message: USER_MESSAGE.INVALID_FORGOT_PASSWORD_TOKEN };
+    }
+
+    return { message: USER_MESSAGE.VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESSFUL };
 }

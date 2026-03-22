@@ -31,6 +31,13 @@ export const USER_MESSAGE = {
     INVALID_EMAIL_VERIFY_TOKEN: "Invalid email verify token",
     RESEND_VERIFY_EMAIL_SUCCESSFUL: "Resend verification email successfully",
 
+    // Forgot Password
+    FORGOT_PASSWORD_EMAIL_SENT: "Forgot password email sent successfully",
+    FORGOT_PASSWORD_TOKEN_REQUIRED: "Forgot password token is required",
+    FORGOT_PASSWORD_TOKEN_MUST_BE_STRING: "Forgot password token must be a string",
+    INVALID_FORGOT_PASSWORD_TOKEN: "Invalid forgot password token",
+    VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESSFUL: "Verify forgot password token successfully",
+
     // General
     INTERNAL_SERVER_ERROR: "Internal server error",
 } as const

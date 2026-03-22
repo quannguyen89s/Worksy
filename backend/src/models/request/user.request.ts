@@ -13,3 +13,11 @@ export interface RegisterRequestBody {
 export interface VerifyEmailRequestBody {
     emailVerifyToken: string
 }
+
+export interface ForgotPasswordRequestBody {
+    email: string
+}
+
+export interface VerifyForgotPasswordRequestBody {
+    forgotPasswordToken: string
+}
