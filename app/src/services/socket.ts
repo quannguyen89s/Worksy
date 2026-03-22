@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BASE_URL } from './api';
+import { BASE_URL, onUnauthorized } from './api';
 
 let socket: Socket | null = null;
 let pending: Promise<Socket> | null = null;
@@ -31,9 +31,15 @@ export async function connectSocket(): Promise<Socket> {
     newSocket.on('connect', () =>
       console.log('[Socket] connected', newSocket.id)
     );
-    newSocket.on('connect_error', (err) =>
-      console.error('[Socket] error', err.message)
-    );
+    newSocket.on('connect_error', async (err) => {
+      console.error('[Socket] error', err.message);
+      // Token không hợp lệ / hết hạn → tự động đăng xuất
+      if (err.message.includes('Token') || err.message.includes('Xác thực')) {
+        await AsyncStorage.multiRemove(['token', 'user']);
+        disconnectSocket();
+        onUnauthorized?.();
+      }
+    });
     newSocket.on('disconnect', (reason) =>
       console.log('[Socket] disconnected', reason)
     );

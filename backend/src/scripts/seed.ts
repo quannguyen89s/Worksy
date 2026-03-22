@@ -1,10 +1,3 @@
-/**
- * Seed MongoDB — dữ liệu mẫu cho tất cả collection (User, Job, Application,
- * Conversation, Message, Notification).
- *
- * Chạy: npm run seed  (mặc định xoá dữ liệu cũ rồi chèn lại)
- * Chỉ chèn thêm, không xoá: npm run seed -- --append
- */
 import "dotenv/config";
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
@@ -38,24 +31,24 @@ async function seed(): Promise<void> {
   const passwordHash = await bcrypt.hash("123456", 10);
 
   const customer = await User.create({
-    name: "Nguyễn Khách (Customer)",
-    email: "customer@worksy.test",
+    name: "Diễm Vi",
+    email: "duongthidiemvi2004@gmail.com",
     password: passwordHash,
     role: "customer",
     avatar: "",
   });
 
   const worker = await User.create({
-    name: "Trần Thợ (Worker)",
-    email: "worker@worksy.test",
+    name: "Vi Vi",
+    email: "vidtdde180752@fpt.edu.vn",
     password: passwordHash,
     role: "worker",
     avatar: "",
   });
 
   const worker2 = await User.create({
-    name: "Lê Thợ 2",
-    email: "worker2@worksy.test",
+    name: "dương vi",
+    email: "diemvi20042007@gmail.com",
     password: passwordHash,
     role: "worker",
     avatar: "",

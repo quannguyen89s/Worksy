@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 import chatService from "../services/chat.service";
 import notificationService from "../services/notification.service";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface AuthSocket extends Socket {
   userId?: string;
@@ -17,11 +16,9 @@ interface SendMessagePayload {
   type?: "text" | "image" | "file";
 }
 
-// ─── Singleton io + online users ──────────────────────────────────────────────
 
 let io: Server;
 
-/** Set userId của các user đang kết nối socket */
 const onlineUsers = new Set<string>();
 
 export function isUserOnline(userId: string): boolean {
@@ -33,10 +30,6 @@ export function getIO(): Server {
   return io;
 }
 
-/**
- * Gửi notification realtime đến một user.
- * Dùng ở bất kỳ service nào sau khi import hàm này.
- */
 export function emitNotification(
   userId: string,
   notification: Record<string, unknown>
@@ -46,7 +39,6 @@ export function emitNotification(
   }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
 
 export function initSocket(server: HttpServer): Server {
   io = new Server(server, {
@@ -56,10 +48,9 @@ export function initSocket(server: HttpServer): Server {
     pingTimeout: 60000,
     pingInterval: 25000,
     connectTimeout: 20000,
-    maxHttpBufferSize: 10 * 1024 * 1024, // 10 MB cho ảnh
+    maxHttpBufferSize: 10 * 1024 * 1024, 
   });
 
-  // JWT auth middleware cho Socket.io
   io.use((socket: AuthSocket, next) => {
     const token =
       (socket.handshake.auth as Record<string, string | undefined>)["token"] ??
@@ -86,46 +77,28 @@ export function initSocket(server: HttpServer): Server {
     const userId = socket.userId!;
     console.log(`[Socket] User kết nối: ${userId} (${socket.id})`);
 
-    // Tham gia phòng riêng để nhận notification
     void socket.join(`user:${userId}`);
 
-    // Đánh dấu user online và broadcast cho TẤT CẢ clients
     onlineUsers.add(userId);
     io.emit("user_online", { userId });
 
-    // ── Chat Events ────────────────────────────────────────────────────────
-
-    /**
-     * Client join vào phòng conversation khi mở màn hình chat.
-     * payload: conversationId (string)
-     */
     socket.on("join_conversation", (conversationId: string) => {
       void socket.join(`conversation:${conversationId}`);
-      // Thông báo cho người kia biết mình online
       socket.to(`conversation:${conversationId}`).emit("user_online", { userId });
     });
 
-    /** Client hỏi trạng thái online của một user */
     socket.on("check_online", (targetUserId: string, callback: (res: { online: boolean }) => void) => {
       if (typeof callback === "function") {
         callback({ online: onlineUsers.has(targetUserId) });
       }
     });
 
-    /**
-     * Client rời phòng conversation khi đóng màn hình.
-     */
     socket.on("leave_conversation", (conversationId: string) => {
       void socket.leave(`conversation:${conversationId}`);
     });
 
-    /**
-     * Gửi tin nhắn mới.
-     * payload: { conversationId, content, type? }
-     */
     socket.on("send_message", async (payload: SendMessagePayload) => {
       const { conversationId, content, type = "text" } = payload;
-      // Với ảnh (base64) không trim, chỉ trim text
       const finalContent = type === "text" ? content?.trim() : content;
 
       if (!conversationId || !finalContent) {
@@ -141,10 +114,8 @@ export function initSocket(server: HttpServer): Server {
           type
         );
 
-        // Broadcast tin nhắn cho tất cả thành viên đang trong phòng chat
         io.to(`conversation:${conversationId}`).emit("new_message", message);
 
-        // Lấy thông tin conversation để tìm recipient
         const conversation =
           await chatService.getConversationWithParticipants(conversationId);
 
@@ -157,15 +128,12 @@ export function initSocket(server: HttpServer): Server {
           for (const participant of participants) {
             const pid = participant._id.toString();
 
-            // Emit conversation_updated vào personal room của TẤT CẢ participants
-            // (kể cả người gửi) để MessagesScreen cập nhật danh sách
             io.to(`user:${pid}`).emit("conversation_updated", {
               conversationId,
               message,
             });
 
             if (pid !== userId) {
-              // Tạo notification và push realtime cho người nhận
               const notification = await notificationService.create(
                 pid,
                 "new_message",
@@ -186,9 +154,6 @@ export function initSocket(server: HttpServer): Server {
       }
     });
 
-    /**
-     * Đang nhập — phát cho các thành viên khác trong phòng.
-     */
     socket.on("typing", (conversationId: string) => {
       socket.to(`conversation:${conversationId}`).emit("user_typing", {
         userId,
@@ -203,9 +168,6 @@ export function initSocket(server: HttpServer): Server {
       });
     });
 
-    /**
-     * Đánh dấu đã đọc và thông báo cho phòng.
-     */
     socket.on("mark_read", async (conversationId: string) => {
       try {
         await chatService.markMessagesRead(conversationId, userId);
@@ -220,9 +182,6 @@ export function initSocket(server: HttpServer): Server {
       }
     });
 
-    // ── Disconnect ─────────────────────────────────────────────────────────
-
-    /** Batch-check nhiều user cùng lúc */
     socket.on("get_online_users", (userIds: string[], callback: (online: string[]) => void) => {
       if (typeof callback === "function") {
         callback(userIds.filter((id) => onlineUsers.has(id)));
@@ -232,7 +191,6 @@ export function initSocket(server: HttpServer): Server {
     socket.on("disconnect", (reason) => {
       console.log(`[Socket] User ngắt kết nối: ${userId} — reason: ${reason}`);
       onlineUsers.delete(userId);
-      // Broadcast offline cho TẤT CẢ clients
       io.emit("user_offline", { userId });
     });
   });

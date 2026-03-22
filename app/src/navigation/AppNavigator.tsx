@@ -9,10 +9,12 @@ import MessagesScreen from '../screens/MessagesScreen';
 import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import HomeScreen from '../screens/HomeScreen';
 import { getUnreadCount as getChatUnread } from '../services/chat.service';
 import { getUnreadCount as getNotifUnread } from '../services/notification.service';
 import { RootStackParamList } from '../types';
-import { connectSocket } from '../services/socket';
+import { connectSocket, disconnectSocket } from '../services/socket';
+import { setUnauthorizedHandler } from '../services/api';
 
 type TabParamList = {
   ChatTab: undefined;
@@ -111,11 +113,17 @@ function RootTabs() {
 
 
 export default function AppNavigator() {
-  const [state, setState] = useState<'loading' | 'login' | 'app'>('loading');
+  const [state, setState] = useState<'loading' | 'home' | 'login' | 'app'>('loading');
 
   useEffect(() => {
     AsyncStorage.getItem('token').then((token) => {
-      setState(token ? 'app' : 'login');
+      setState(token ? 'app' : 'home');
+    });
+
+    // Khi token hết hạn / không hợp lệ → về trang Home
+    setUnauthorizedHandler(() => {
+      disconnectSocket();
+      setState('home');
     });
   }, []);
 
@@ -124,6 +132,14 @@ export default function AppNavigator() {
       <View style={{ flex: 1, backgroundColor: '#0f0f1a', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#6C63FF" size="large" />
       </View>
+    );
+  }
+
+  if (state === 'home') {
+    return (
+      <NavigationContainer>
+        <HomeScreen onLoginPress={() => setState('login')} />
+      </NavigationContainer>
     );
   }
 
