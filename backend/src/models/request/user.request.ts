@@ -9,3 +9,7 @@ export interface RegisterRequestBody {
     password: string
     confirm_password: string
 }
+
+export interface VerifyEmailRequestBody {
+    emailVerifyToken: string
+}

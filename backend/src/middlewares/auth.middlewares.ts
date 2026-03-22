@@ -3,28 +3,29 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { checkSchema } from "express-validator";
 import userModel from "../models/user.model";
 import { validate } from "../utils/validation";
+import USER_MESSAGE from "../constants/userMessage";
 
 const loginValidator = checkSchema({
     email: {
         notEmpty: {
-            errorMessage: "Email không được để trống",
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
         },
         isEmail: {
-            errorMessage: "Email không hợp lệ",
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
         },
         trim: true,
     },
     password: {
         notEmpty: {
-            errorMessage: "Mật khẩu không được để trống",
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
         },
         isLength: {
             options: { min: 6 },
-            errorMessage: "Mật khẩu phải có ít nhất 6 ký tự",
+            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
         },
         matches: {
             options: /[A-Z]/,
-            errorMessage: "Mật khẩu phải có ít nhất 1 chữ viết hoa",
+            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
         },
     },
 }, ["body"]);
@@ -32,18 +33,18 @@ const loginValidator = checkSchema({
 const registerValidator = checkSchema({
     name: {
         notEmpty: {
-            errorMessage: "Tên không được để trống",
+            errorMessage: USER_MESSAGE.NAME_REQUIRED,
         },
         isLength: {
             options: { min: 2, max: 50 },
-            errorMessage: "Tên phải từ 2 đến 50 ký tự",
+            errorMessage: USER_MESSAGE.NAME_LENGTH,
         },
         trim: true,
         custom: {
             options: async (value: string) => {
                 const user = await userModel.findOne({ name: value });
                 if (user) {
-                    throw new Error("Tên đã tồn tại");
+                    throw new Error(USER_MESSAGE.NAME_ALREADY_EXISTS);
                 }
                 return true;
             },
@@ -51,17 +52,17 @@ const registerValidator = checkSchema({
     },
     email: {
         notEmpty: {
-            errorMessage: "Email không được để trống",
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
         },
         isEmail: {
-            errorMessage: "Email không hợp lệ",
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
         },
         trim: true,
         custom: {
             options: async (value: string) => {
                 const user = await userModel.findOne({ email: value });
                 if (user) {
-                    throw new Error("Email đã tồn tại");
+                    throw new Error(USER_MESSAGE.EMAIL_ALREADY_EXISTS);
                 }
                 return true;
             },
@@ -69,20 +70,20 @@ const registerValidator = checkSchema({
     },
     password: {
         notEmpty: {
-            errorMessage: "Mật khẩu không được để trống",
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
         },
         isLength: {
             options: { min: 6 },
-            errorMessage: "Mật khẩu phải có ít nhất 6 ký tự",
+            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
         },
         matches: {
             options: /[A-Z]/,
-            errorMessage: "Mật khẩu phải có ít nhất 1 chữ viết hoa",
+            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
         },
         custom: {
             options: (value: string) => {
                 if (!/[0-9]/.test(value)) {
-                    throw new Error("Mật khẩu phải có ít nhất 1 chữ số");
+                    throw new Error(USER_MESSAGE.PASSWORD_NUMBER);
                 }
                 return true;
             },
@@ -90,12 +91,12 @@ const registerValidator = checkSchema({
     },
     confirm_password: {
         notEmpty: {
-            errorMessage: "Xác nhận mật khẩu không được để trống",
+            errorMessage: USER_MESSAGE.CONFIRM_PASSWORD_REQUIRED,
         },
         custom: {
             options: (value, { req }) => {
                 if (value !== req.body.password) {
-                    throw new Error("Xác nhận mật khẩu không khớp");
+                    throw new Error(USER_MESSAGE.CONFIRM_PASSWORD_NOT_MATCH);
                 }
                 return true;
             },
@@ -105,3 +106,33 @@ const registerValidator = checkSchema({
 
 export const loginMiddleware = validate(loginValidator);
 export const registerMiddleware = validate(registerValidator);
+
+const emailVerifyValidator = checkSchema({
+    emailVerifyToken: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_VERIFY_TOKEN_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.EMAIL_VERIFY_TOKEN_MUST_BE_STRING,
+        },
+        trim: true,
+    },
+}, ["body"]);
+
+export const verifyEmailMiddleware = validate(emailVerifyValidator);
+
+const resendVerifyEmailValidator = checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+}, ["body"]);
+
+export const resendVerifyEmailMiddleware = validate(resendVerifyEmailValidator);
+
+

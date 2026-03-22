@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { UserVerifyStatus } from "../constants/enum";
+import { Role, UserVerifyStatus } from "../constants/enum";
 
 const userSchema = new mongoose.Schema(
   {
@@ -20,8 +20,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["customer", "worker", "admin"],
-      default: "customer",
+      default: Role.Customer,
     },
     avatar: {
       type: String,
