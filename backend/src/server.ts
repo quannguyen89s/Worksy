@@ -7,8 +7,8 @@ const app = express();
 connectDB();
 app.use(json());
 
-app.use("/", (req: Request, res: Response ) => {
-    res.json('Connect succesfull')
+app.use("/", (req: Request, res: Response) => {
+  res.json('Connect succesfull')
 });
 
 
