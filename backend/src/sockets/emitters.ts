@@ -29,3 +29,19 @@ export function emitApplyNew(customerUserId: string, jobId: string, applyId: str
   if (!io) return;
   io.to(`user:${customerUserId}`).emit("apply:new", { jobId, applyId });
 }
+
+export function emitJobCompleted(
+  jobId: string,
+  customerUserId: string,
+  workerUserIds: string[],
+  source: "manual" | "auto",
+) {
+  const io = getIo();
+  if (!io) return;
+  const payload = { jobId, source };
+  io.to(`user:${customerUserId}`).emit("job:completed", payload);
+  for (const workerId of workerUserIds) {
+    io.to(`user:${workerId}`).emit("job:completed", payload);
+  }
+  io.to(`job:${jobId}`).emit("job:completed", payload);
+}

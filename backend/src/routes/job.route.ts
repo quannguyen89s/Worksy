@@ -7,6 +7,7 @@ import {
   deleteJobController,
   getJobController,
   listApplicantsController,
+  listJobsBrowseController,
   listJobsController,
   listMyJobsController,
   listRecommendedController,
@@ -18,6 +19,7 @@ import { requireAuth, requireRole } from "../middlewares/requireAuth.middleware"
 const jobRouter = Router();
 
 jobRouter.get("/", listJobsController);
+jobRouter.get("/browse", requireAuth, requireRole("worker"), listJobsBrowseController);
 jobRouter.get("/pending", requireAuth, requireRole("admin"), listPendingJobsController);
 jobRouter.get("/recommended", requireAuth, requireRole("worker"), listRecommendedController);
 jobRouter.get("/mine", requireAuth, requireRole("customer"), listMyJobsController);

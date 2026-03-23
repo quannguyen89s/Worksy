@@ -20,6 +20,10 @@ const jobSchema = new mongoose.Schema(
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
     },
+    scheduledAt: {
+      type: Date,
+      default: null,
+    },
     skillTags: {
       type: [String],
       default: [],
@@ -40,8 +44,30 @@ const jobSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "open", "partial", "full", "done"],
+      enum: ["pending", "open", "full", "done"],
       default: "pending",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    completedAt: {
+      type: Date,
+      default: null,
+    },
+    completionDueAt: {
+      type: Date,
+      default: null,
+    },
+    completionSource: {
+      type: String,
+      enum: ["manual", "auto"],
+      default: null,
+    },
+    autoDoneAfterHours: {
+      type: Number,
+      min: 1,
+      default: null,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -56,5 +82,7 @@ const jobSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+jobSchema.index({ status: 1, completionDueAt: 1 });
 
 export default mongoose.model("Job", jobSchema);

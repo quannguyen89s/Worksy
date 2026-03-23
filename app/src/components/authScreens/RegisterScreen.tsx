@@ -11,23 +11,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import authService from '@/services/authService';
+import { COLORS } from '@/theme/colors';
+import type { RootStackParamList } from '@/navigation/types';
 
-const C = {
-  bg: '#FFF8E7',
-  card: '#FFFFFF',
-  primary: '#92400E',
-  primaryLight: '#F5E6D3',
-  text: '#3F3F46',
-  textLight: '#71717A',
-  border: '#E4D5C3',
-  error: '#DC2626',
-  success: '#16A34A',
-};
-
-interface Props {
-  navigation: any;
-}
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
   const [name, setName] = useState('');
@@ -80,104 +69,110 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: C.bg }]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={s.flex}>
+        style={styles.flex1}
+      >
         <ScrollView
-          style={s.flex}
-          contentContainerStyle={s.scroll}
-          keyboardShouldPersistTaps="handled">
-
-          {/* Logo */}
-          <View style={s.logoSection}>
-            <Text style={[s.logoText, { color: C.primary }]}>Worksy</Text>
-            <Text style={[s.logoSub, { color: C.textLight }]}>Tạo tài khoản mới</Text>
+          style={styles.flex1}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.hero}>
+            <Text style={styles.logo}>Worksy</Text>
+            <Text style={styles.subtitle}>Tạo tài khoản mới</Text>
           </View>
 
-          {/* Form Card */}
-          <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Đăng ký</Text>
+            <Text style={styles.cardHint}>Điền thông tin để bắt đầu</Text>
 
             {errorMsg ? (
-              <View style={[s.msgBox, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={[s.msgText, { color: C.error }]}>{errorMsg}</Text>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
             ) : null}
 
             {successMsg ? (
-              <View style={[s.msgBox, { backgroundColor: '#DCFCE7' }]}>
-                <Text style={[s.msgText, { color: C.success }]}>{successMsg}</Text>
-                <TouchableOpacity style={{ marginTop: 8 }} onPress={() => navigation.navigate('Login')}>
-                  <Text style={[s.msgText, { color: C.primary, fontWeight: '600' }]}>← Về trang đăng nhập</Text>
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>{successMsg}</Text>
+                <TouchableOpacity style={styles.successLink} onPress={() => navigation.navigate('Login')}>
+                  <Text style={styles.successLinkText}>← Về trang đăng nhập</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
-            <Text style={[s.label, { color: C.text }]}>Họ và tên</Text>
+            <Text style={styles.label}>Họ và tên</Text>
             <TextInput
-              style={[s.input, { backgroundColor: C.primaryLight, color: C.text, borderColor: C.border }]}
-              placeholder="Nhập họ và tên"
-              placeholderTextColor={C.textLight}
+              style={styles.input}
+              placeholder="Nguyễn Văn A"
+              placeholderTextColor={COLORS.textMuted}
               value={name}
-              onChangeText={(t) => { setName(t); clear(); }}
+              onChangeText={(t) => { setName(t); clearError(); }}
             />
 
-            <Text style={[s.label, { color: C.text }]}>Email</Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
-              style={[s.input, { backgroundColor: C.primaryLight, color: C.text, borderColor: C.border }]}
-              placeholder="Nhập email của bạn"
-              placeholderTextColor={C.textLight}
+              style={styles.input}
+              placeholder="your@email.com"
+              placeholderTextColor={COLORS.textMuted}
               value={email}
-              onChangeText={(t) => { setEmail(t); clear(); }}
+              onChangeText={(t) => { setEmail(t); clearError(); }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
 
-            <Text style={[s.label, { color: C.text }]}>Mật khẩu</Text>
-            <View style={s.pwWrap}>
+            <Text style={styles.label}>Mật khẩu</Text>
+            <Text style={styles.hint}>Tối thiểu 6 ký tự, có chữ hoa và số</Text>
+            <View style={styles.passwordWrap}>
               <TextInput
-                style={[s.input, s.pwInput, { backgroundColor: C.primaryLight, color: C.text, borderColor: C.border }]}
-                placeholder="Tối thiểu 6 ký tự, có chữ hoa và số"
-                placeholderTextColor={C.textLight}
+                style={styles.inputPassword}
+                placeholder="••••••••"
+                placeholderTextColor={COLORS.textMuted}
                 value={password}
-                onChangeText={(t) => { setPassword(t); clear(); }}
+                onChangeText={(t) => { setPassword(t); clearError(); }}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword((v) => !v)}>
-                <Text style={[s.eyeText, { color: C.primary }]}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
+              <TouchableOpacity style={styles.togglePass} onPress={() => setShowPassword(!showPassword)}>
+                <Text style={styles.togglePassText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[s.label, { color: C.text }]}>Xác nhận mật khẩu</Text>
-            <View style={[s.pwWrap, { marginBottom: 24 }]}>
+            <Text style={styles.label}>Xác nhận mật khẩu</Text>
+            <View style={styles.passwordWrap}>
               <TextInput
-                style={[s.input, s.pwInput, { backgroundColor: C.primaryLight, color: C.text, borderColor: C.border }]}
-                placeholder="Nhập lại mật khẩu"
-                placeholderTextColor={C.textLight}
+                style={styles.inputPassword}
+                placeholder="••••••••"
+                placeholderTextColor={COLORS.textMuted}
                 value={confirmPassword}
-                onChangeText={(t) => { setConfirmPassword(t); clear(); }}
+                onChangeText={(t) => { setConfirmPassword(t); clearError(); }}
                 secureTextEntry={!showConfirmPassword}
               />
-              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirmPassword((v) => !v)}>
-                <Text style={[s.eyeText, { color: C.primary }]}>{showConfirmPassword ? 'Ẩn' : 'Hiện'}</Text>
+              <TouchableOpacity style={styles.togglePass} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                <Text style={styles.togglePassText}>{showConfirmPassword ? 'Ẩn' : 'Hiện'}</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={[s.btn, { backgroundColor: loading ? '#B45309' : C.primary }]}
+              style={[styles.btnPrimary, loading && styles.btnPrimaryDisabled]}
               onPress={handleRegister}
-              activeOpacity={0.8}
-              disabled={loading}>
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.btnText}>Đăng ký</Text>}
+              activeOpacity={0.85}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>Đăng ký</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <View style={s.footer}>
-            <Text style={[s.footerText, { color: C.textLight }]}>Đã có tài khoản? </Text>
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>Đã có tài khoản? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={[s.footerLink, { color: C.primary }]}>Đăng nhập</Text>
+              <Text style={styles.loginLink}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
 
@@ -187,32 +182,89 @@ export default function RegisterScreen({ navigation }: Props) {
   );
 }
 
-const s = StyleSheet.create({
-  safe: { flex: 1 },
-  flex: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  logoSection: { alignItems: 'center', marginBottom: 40 },
-  logoText: { fontSize: 36, fontWeight: '700' },
-  logoSub: { fontSize: 16, marginTop: 8 },
-  card: { borderRadius: 16, padding: 24, borderWidth: 1 },
-  msgBox: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 },
-  msgText: { fontSize: 14 },
-  label: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  input: {
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 16,
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  flex1: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24, paddingBottom: 48 },
+  hero: { alignItems: 'center', marginBottom: 28 },
+  logo: { fontSize: 38, fontWeight: '800', color: COLORS.primary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: COLORS.textSecondary, marginTop: 6 },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
     borderWidth: 1,
+    borderColor: COLORS.borderLight,
   },
-  pwWrap: { position: 'relative', marginBottom: 16 },
-  pwInput: { paddingRight: 64, marginBottom: 0 },
-  eyeBtn: { position: 'absolute', right: 12, top: 12 },
-  eyeText: { fontSize: 14, fontWeight: '500' },
-  btn: { borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
-  footerText: { fontSize: 14 },
-  footerLink: { fontSize: 14, fontWeight: '600' },
+  cardTitle: { fontSize: 22, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  cardHint: { fontSize: 14, color: COLORS.textMuted, marginBottom: 20 },
+  errorBox: {
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+  },
+  errorText: { fontSize: 14, color: COLORS.error, fontWeight: '500' },
+  successBox: {
+    backgroundColor: COLORS.successLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.success,
+  },
+  successText: { fontSize: 14, color: COLORS.success, fontWeight: '500' },
+  successLink: { marginTop: 8 },
+  successLinkText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+  hint: { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
+  input: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 16,
+  },
+  passwordWrap: { position: 'relative', marginBottom: 16 },
+  inputPassword: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    paddingRight: 72,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  togglePass: { position: 'absolute', right: 16, top: 14 },
+  togglePassText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 8,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  btnPrimaryDisabled: { opacity: 0.85 },
+  btnPrimaryText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  loginText: { fontSize: 15, color: COLORS.textMuted },
+  loginLink: { fontSize: 15, fontWeight: '700', color: COLORS.primary },
 });
