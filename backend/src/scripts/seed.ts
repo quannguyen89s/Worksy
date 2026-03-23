@@ -28,7 +28,7 @@ async function seed(): Promise<void> {
     await clearAll();
   }
 
-  const passwordHash = await bcrypt.hash("123456", 10);
+  const passwordHash = await bcrypt.hash("Password123!", 10);
 
   const customer = await User.create({
     name: "Diễm Vi",
@@ -61,6 +61,10 @@ async function seed(): Promise<void> {
     title: "Lắp đặt điều hòa tại Q1",
     description: "Cần thợ có kinh nghiệm lắp đặt máy lạnh inverter.",
     price: 1500000,
+    location: { lat: 10.7769, lng: 106.7009 },
+    requiredWorkers: 1,
+    assignedWorkers: 0,
+    skillTags: ["dien-lanh", "lap-dat"],
     status: "open",
     createdBy: customer._id,
     assignedTo: null,
@@ -70,7 +74,12 @@ async function seed(): Promise<void> {
     title: "Sửa ống nước gấp",
     description: "Rò rỉ tại nhà vệ sinh, cần xử lý trong ngày.",
     price: 500000,
-    status: "assigned",
+    location: { lat: 10.7808, lng: 106.6992 },
+    requiredWorkers: 1,
+    assignedWorkers: 1,
+    assignedWorkerIds: [worker._id],
+    skillTags: ["dien-nuoc", "sua-chua"],
+    status: "full",
     createdBy: customer._id,
     assignedTo: worker._id,
   });
@@ -151,7 +160,7 @@ async function seed(): Promise<void> {
   });
 
   console.log("\n========== SEED HOÀN TẤT ==========\n");
-  console.log("Đăng nhập test (mật khẩu: 123456):");
+  console.log("Đăng nhập test (mật khẩu: Password123!):");
   console.log("  Customer:", customer.email);
   console.log("  Worker:  ", worker.email);
   console.log("  Worker2: ", worker2.email);
@@ -160,7 +169,7 @@ async function seed(): Promise<void> {
   console.log("  worker._id:  ", worker._id.toString());
   console.log("\nJob / Conversation:");
   console.log("  job1 (open):     ", job1._id.toString());
-  console.log("  job2 (assigned): ", job2._id.toString());
+  console.log("  job2 (full):     ", job2._id.toString());
   console.log("  conversation:    ", conv._id.toString());
   console.log("\nChạy lại từ đầu: npm run seed -- --reset\n");
 

@@ -1,13 +1,13 @@
-import { Router, Response } from "express";
-import { authenticate, AuthRequest } from "../middlewares/access.middleware";
+import { Router, Request, Response } from "express";
+import { requireAuth } from "../middlewares/requireAuth.middleware";
 import userModel from "../models/user.model";
 
 const router = Router();
 
-router.get("/me", authenticate, async (req, res: Response) => {
+router.get("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const user = await userModel
-      .findById((req as AuthRequest).user.id)
+      .findById(req.user!.id)
       .select("_id name email role avatar");
 
     if (!user) {

@@ -34,7 +34,7 @@ const signEmailVerifyToken = (userId: string) => {
 
 export const loginService = async (email: string, password: string) => {
 
-    const user = await userModel.findOne({ email });
+    const user = await userModel.findOne({ email }).select("+password");
     if (!user) {
         return { message: USER_MESSAGE.USER_NOT_FOUND };
     }
@@ -45,10 +45,21 @@ export const loginService = async (email: string, password: string) => {
     if (!user.isVerified) {
         return { message: USER_MESSAGE.EMAIL_NOT_VERIFIED };
     }
-    const [accessToken, refreshToken] = await Promise.all([
-        signAccessToken(user._id.toString()),
-        signRefreshToken(user._id.toString()),
-    ]);
+    const accessToken = jwt.sign(
+        {
+            _id: user._id,
+            sub: String(user._id),
+            role: user.role,
+            name: user.name,
+        },
+        process.env.JWT_SECRET_ACCESS_TOKEN!,
+        { expiresIn: "7d" },
+    );
+    const refreshToken = jwt.sign(
+        { _id: user._id },
+        process.env.JWT_SECRET_REFRESH_TOKEN!,
+        { expiresIn: "7d" }
+    );
     user.refreshToken = refreshToken;
     await user.save();
 

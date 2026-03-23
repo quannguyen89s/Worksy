@@ -62,10 +62,16 @@ export function initSocket(server: HttpServer): Server {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET_ACCESS_TOKEN ?? "") as {
-        _id: string;
+        _id?: string;
+        sub?: string;
+        id?: string;
         role?: string;
       };
-      socket.userId = decoded._id;
+      const userId = decoded._id ?? decoded.sub ?? decoded.id;
+      if (!userId) {
+        return next(new Error("Token không hợp lệ"));
+      }
+      socket.userId = userId;
       socket.userRole = decoded.role ?? "";
       next();
     } catch {

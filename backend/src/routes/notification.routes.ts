@@ -1,34 +1,19 @@
 import { Router } from "express";
-import { authenticate } from "../middlewares/access.middleware";
-import notificationController from "../controllers/notification.controller";
+import {
+  getNotificationsController,
+  getNotificationUnreadCountController,
+  markReadController,
+  markAllReadController,
+  deleteNotificationController,
+} from "../controllers/notification.controller";
+import { requireAuth } from "../middlewares/requireAuth.middleware";
 
-const router = Router();
+const notificationRouter = Router();
 
-router.use(authenticate);
+notificationRouter.get("/", requireAuth, getNotificationsController);
+notificationRouter.get("/unread-count", requireAuth, getNotificationUnreadCountController);
+notificationRouter.patch("/read-all", requireAuth, markAllReadController);
+notificationRouter.patch("/:id/read", requireAuth, markReadController);
+notificationRouter.delete("/:id", requireAuth, deleteNotificationController);
 
-
-router.get("/", (req, res) =>
-  notificationController.getNotifications(req, res)
-);
-
-
-router.get("/unread-count", (req, res) =>
-  notificationController.getUnreadCount(req, res)
-);
-
-
-router.patch("/read-all", (req, res) =>
-  notificationController.markAllRead(req, res)
-);
-
-
-router.patch("/:id/read", (req, res) =>
-  notificationController.markRead(req, res)
-);
-
-
-router.delete("/:id", (req, res) =>
-  notificationController.deleteNotification(req, res)
-);
-
-export default router;
+export default notificationRouter;

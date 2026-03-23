@@ -1,9 +1,16 @@
+import cors from "cors";
 import express, { json, Request, Response, urlencoded } from "express";
 import connectDB from "./config/db";
-import authRoutes from "./routes/auth.route";
-import chatRoutes from "./routes/chat.routes";
-import notificationRoutes from "./routes/notification.routes";
-import userRoutes from "./routes/user.routes";
+import { getCorsOptions } from "./config/corsOptions";
+import { errorHandler } from "./middlewares/error.middlewares";
+
+import authRouter from "./routes/auth.route";
+import applyRouter from "./routes/apply.route";
+import jobRouter from "./routes/job.route";
+import reviewRouter from "./routes/review.route";
+import chatRouter from "./routes/chat.routes";
+import notificationRouter from "./routes/notification.routes";
+import userRouter from "./routes/user.routes";
 
 import "./models/user.model";
 import "./models/job.model";
@@ -12,16 +19,25 @@ import "./models/application.model";
 const app = express();
 
 connectDB();
+app.use(cors(getCorsOptions()));
 app.use(json({ limit: '20mb' }));
 app.use(urlencoded({ extended: true, limit: '20mb' }));
 
-app.get("/", (req: Request, res: Response) => {
-    res.json('Connect succesfull')
+app.get("/", (_req: Request, res: Response) => {
+  res.json("Connect succesfull");
 });
 
-app.use("/auth", authRoutes);
-app.use("/chat", chatRoutes);
-app.use("/notifications", notificationRoutes);
-app.use("/users", userRoutes);
+app.use("/auth", authRouter);
+app.use("/jobs", jobRouter);
+app.use("/apply", applyRouter);
+app.use("/review", reviewRouter);
+app.use("/chat", chatRouter);
+app.use("/notifications", notificationRouter);
+app.use("/users", userRouter);
+
+app.use((_req, res) => {
+  res.status(404).json({ success: false, message: "Not found" });
+});
+app.use(errorHandler);
 
 export default app;

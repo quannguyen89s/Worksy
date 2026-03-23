@@ -213,20 +213,20 @@ export default function MessagesScreen({ navigation }: Props) {
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="search" size={22} color="#e8e8f0" />
+            <Ionicons name="search" size={22} color="#9CA3AF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="add" size={24} color="#e8e8f0" />
+            <Ionicons name="add" size={24} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.searchWrapper}>
-        <Ionicons name="search" size={16} color="#888" style={styles.searchIcon} />
+        <Ionicons name="search" size={16} color="#6B7280" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
-          placeholderTextColor="#666"
+          placeholderTextColor="#A38A56"
           value={query}
           onChangeText={setQuery}
         />
@@ -234,21 +234,21 @@ export default function MessagesScreen({ navigation }: Props) {
 
       {error ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="warning-outline" size={40} color="#E57373" />
+          <Ionicons name="warning-outline" size={40} color="#F87171" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => void load()}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
       ) : loading ? (
-        <ActivityIndicator color="#6C63FF" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#C98A00" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C63FF" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C98A00" />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -262,7 +262,7 @@ export default function MessagesScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0f0f1a' },
+  safe: { flex: 1, backgroundColor: '#111827' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -270,27 +270,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#fff' },
+  headerTitle: { fontSize: 24, fontWeight: '700', color: '#F9FAFB' },
   headerActions: { flexDirection: 'row', gap: 4 },
   iconBtn: { padding: 8 },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e1e30',
+    backgroundColor: '#1F2937',
     borderRadius: 14,
     marginHorizontal: 16,
     marginBottom: 8,
     paddingHorizontal: 14,
   },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, height: 42, color: '#e8e8f0', fontSize: 14 },
+  searchInput: { flex: 1, height: 42, color: '#F9FAFB', fontSize: 14 },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#1e1e30',
+    borderBottomColor: '#374151',
   },
   itemBody: { flex: 1, marginLeft: 14 },
   itemTop: {
@@ -298,26 +298,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  itemName: { fontSize: 15, fontWeight: '600', color: '#fff', flex: 1, marginRight: 8 },
-  itemTime: { fontSize: 12, color: '#888' },
+  itemName: { fontSize: 15, fontWeight: '600', color: '#F9FAFB', flex: 1, marginRight: 8 },
+  itemTime: { fontSize: 12, color: '#6B7280' },
   itemSub: { marginTop: 2 },
-  rolePill: { fontSize: 12, color: '#9b9bc0', marginTop: 2 },
+  rolePill: { fontSize: 12, color: '#6B7280', marginTop: 2 },
   itemBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 3,
   },
-  itemPreview: { fontSize: 13, color: '#888', flex: 1, marginRight: 8 },
-  itemPreviewBold: { color: '#ccc', fontWeight: '500' },
+  itemPreview: { fontSize: 13, color: '#9CA3AF', flex: 1, marginRight: 8 },
+  itemPreviewBold: { color: '#F9FAFB', fontWeight: '500' },
   emptyContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
-  empty: { textAlign: 'center', color: '#555', fontSize: 14, marginTop: 12 },
-  errorText: { color: '#E57373', fontSize: 14, textAlign: 'center', marginTop: 12 },
+  empty: { textAlign: 'center', color: '#9CA3AF', fontSize: 14, marginTop: 12 },
+  errorText: { color: '#F87171', fontSize: 14, textAlign: 'center', marginTop: 12 },
   retryBtn: {
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#C98A00',
     borderRadius: 20,
   },
   retryText: { color: '#fff', fontWeight: '600' },

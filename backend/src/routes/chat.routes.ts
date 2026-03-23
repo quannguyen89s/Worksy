@@ -1,33 +1,21 @@
 import { Router } from "express";
-import { authenticate } from "../middlewares/access.middleware";
-import chatController from "../controllers/chat.controller";
+import {
+  getConversationsController,
+  createConversationController,
+  getMessagesController,
+  markReadController,
+  sendImageController,
+  getUnreadCountController,
+} from "../controllers/chat.controller";
+import { requireAuth } from "../middlewares/requireAuth.middleware";
 
-const router = Router();
+const chatRouter = Router();
 
-router.use(authenticate);
+chatRouter.get("/unread", requireAuth, getUnreadCountController);
+chatRouter.get("/conversations", requireAuth, getConversationsController);
+chatRouter.post("/conversations", requireAuth, createConversationController);
+chatRouter.get("/conversations/:id/messages", requireAuth, getMessagesController);
+chatRouter.post("/conversations/:id/read", requireAuth, markReadController);
+chatRouter.post("/conversations/:id/image", requireAuth, sendImageController);
 
-router.get("/unread", (req, res) =>
-  chatController.getUnreadCount(req, res)
-);
-
-router.get("/conversations", (req, res) =>
-  chatController.getConversations(req, res)
-);
-
-router.post("/conversations", (req, res) =>
-  chatController.createConversation(req, res)
-);
-
-router.get("/conversations/:id/messages", (req, res) =>
-  chatController.getMessages(req, res)
-);
-
-router.post("/conversations/:id/read", (req, res) =>
-  chatController.markRead(req, res)
-);
-
-router.post("/conversations/:id/image", (req, res) =>
-  chatController.sendImage(req, res)
-);
-
-export default router;
+export default chatRouter;

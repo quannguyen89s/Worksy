@@ -10,19 +10,21 @@ import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import HomeScreen from '../screens/HomeScreen';
+import AppHomeScreen from '../screens/AppHomeScreen';
 import { getUnreadCount as getChatUnread } from '../services/chat.service';
 import { getUnreadCount as getNotifUnread } from '../services/notification.service';
 import { RootStackParamList } from '../types';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import { setUnauthorizedHandler } from '../services/api';
 
-type TabParamList = {
+type AppTabParamList = {
+  HomeTab: undefined;
   ChatTab: undefined;
   NotifTab: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<TabParamList>();
+const Tab = createBottomTabNavigator<AppTabParamList>();
 
 function TabBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -58,8 +60,7 @@ function ChatStack() {
   );
 }
 
-
-function RootTabs() {
+function RootTabs({ onLogout }: { onLogout: () => void }) {
   const [msgUnread, setMsgUnread] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
 
@@ -89,15 +90,35 @@ function RootTabs() {
           paddingBottom: 8,
         },
         tabBarIcon: ({ focused, color, size }) => {
-          const isChatTab = route.name === 'ChatTab';
-          const iconName: keyof typeof Ionicons.glyphMap = isChatTab
-            ? focused ? 'chatbubbles' : 'chatbubbles-outline'
-            : focused ? 'notifications' : 'notifications-outline';
-          const count = isChatTab ? msgUnread : notifUnread;
+          if (route.name === 'HomeTab') {
+            return (
+              <Ionicons
+                name={focused ? 'home' : 'home-outline'}
+                size={size}
+                color={color}
+              />
+            );
+          }
+          if (route.name === 'ChatTab') {
+            return (
+              <View>
+                <Ionicons
+                  name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+                  size={size}
+                  color={color}
+                />
+                <TabBadge count={msgUnread} />
+              </View>
+            );
+          }
           return (
             <View>
-              <Ionicons name={iconName} size={size} color={color} />
-              <TabBadge count={count} />
+              <Ionicons
+                name={focused ? 'notifications' : 'notifications-outline'}
+                size={size}
+                color={color}
+              />
+              <TabBadge count={notifUnread} />
             </View>
           );
         },
@@ -105,12 +126,14 @@ function RootTabs() {
         tabBarInactiveTintColor: '#555',
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       })}>
+      <Tab.Screen name="HomeTab" options={{ title: 'Trang chủ' }}>
+        {() => <AppHomeScreen onLogout={onLogout} />}
+      </Tab.Screen>
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: 'Tin nhắn' }} />
       <Tab.Screen name="NotifTab" component={NotificationsScreen} options={{ title: 'Thông báo' }} />
     </Tab.Navigator>
   );
 }
-
 
 export default function AppNavigator() {
   const [state, setState] = useState<'loading' | 'home' | 'login' | 'app'>('loading');
@@ -120,7 +143,6 @@ export default function AppNavigator() {
       setState(token ? 'app' : 'home');
     });
 
-    // Khi token hết hạn / không hợp lệ → về trang Home
     setUnauthorizedHandler(() => {
       disconnectSocket();
       setState('home');
@@ -153,7 +175,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <RootTabs />
+      <RootTabs onLogout={() => setState('home')} />
     </NavigationContainer>
   );
 }

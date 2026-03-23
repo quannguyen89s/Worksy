@@ -19,12 +19,12 @@ import { connectSocket } from '../services/socket';
 import { Notification } from '../types';
 
 const ICON_MAP: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  new_message: { name: 'chatbubble-ellipses', color: '#6C63FF' },
-  job_application: { name: 'briefcase', color: '#43B89C' },
-  application_accepted: { name: 'checkmark-circle', color: '#4CAF50' },
-  application_rejected: { name: 'close-circle', color: '#E57373' },
-  job_assigned: { name: 'person-add', color: '#F9A825' },
-  job_completed: { name: 'trophy', color: '#64B5F6' },
+  new_message: { name: 'chatbubble-ellipses', color: '#C98A00' },
+  job_application: { name: 'briefcase', color: '#818CF8' },
+  application_accepted: { name: 'checkmark-circle', color: '#34D399' },
+  application_rejected: { name: 'close-circle', color: '#F87171' },
+  job_assigned: { name: 'person-add', color: '#60A5FA' },
+  job_completed: { name: 'trophy', color: '#FBBF24' },
 };
 
 function formatTime(iso: string): string {
@@ -154,7 +154,7 @@ export default function NotificationsScreen() {
   const renderItem = ({ item }: { item: Notification }) => {
     const icon = ICON_MAP[item.type] ?? {
       name: 'notifications' as keyof typeof Ionicons.glyphMap,
-      color: '#888',
+      color: '#9CA3AF',
     };
     const isNavigatingThis = navigating === item._id;
     const isClickable = item.type === 'new_message';
@@ -175,7 +175,7 @@ export default function NotificationsScreen() {
           <View style={styles.itemTop}>
             <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
             {isClickable && (
-              <Ionicons name="chevron-forward" size={14} color="#555" style={styles.chevron} />
+              <Ionicons name="chevron-forward" size={14} color="#6B7280" style={styles.chevron} />
             )}
           </View>
           <Text style={styles.itemBody} numberOfLines={2}>{item.body}</Text>
@@ -198,10 +198,10 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#6C63FF" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#C98A00" style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={56} color="#333" />
+          <Ionicons name="notifications-off-outline" size={56} color="#6B7280" />
           <Text style={styles.empty}>Chưa có thông báo nào</Text>
         </View>
       ) : (
@@ -217,7 +217,7 @@ export default function NotificationsScreen() {
             </>
           )}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6C63FF" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C98A00" />
           }
         />
       )}
@@ -226,7 +226,7 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0f0f1a' },
+  safe: { flex: 1, backgroundColor: '#111827' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -234,12 +234,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#fff' },
-  readAll: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
+  headerTitle: { fontSize: 22, fontWeight: '700', color: '#F9FAFB' },
+  readAll: { fontSize: 14, color: '#C98A00', fontWeight: '600' },
   groupLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#666',
+    color: '#6B7280',
     letterSpacing: 0.8,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#1a1a2a',
+    borderBottomColor: '#374151',
   },
-  itemUnread: { backgroundColor: '#13132a' },
+  itemUnread: { backgroundColor: '#1F2937' },
   iconWrap: {
     width: 44,
     height: 44,
@@ -264,19 +264,19 @@ const styles = StyleSheet.create({
   },
   itemContent: { flex: 1 },
   itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  itemTitle: { fontSize: 14, fontWeight: '600', color: '#e8e8f0', flex: 1, marginBottom: 3 },
+  itemTitle: { fontSize: 14, fontWeight: '600', color: '#F9FAFB', flex: 1, marginBottom: 3 },
   chevron: { marginLeft: 4 },
-  itemBody: { fontSize: 13, color: '#999', lineHeight: 18 },
-  itemTime: { fontSize: 12, color: '#555', marginTop: 5 },
+  itemBody: { fontSize: 13, color: '#9CA3AF', lineHeight: 18 },
+  itemTime: { fontSize: 12, color: '#6B7280', marginTop: 5 },
   dot: {
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#C98A00',
     marginTop: 6,
     marginLeft: 8,
     flexShrink: 0,
   },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  empty: { color: '#555', fontSize: 14 },
+  empty: { color: '#9CA3AF', fontSize: 14 },
 });

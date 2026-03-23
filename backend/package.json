@@ -4,7 +4,7 @@
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server.ts",
+    "dev": "nodemon",
     "build": "tsc",
     "start": "node dist/index.ts",
     "seed": "ts-node --transpile-only src/scripts/seed.ts"

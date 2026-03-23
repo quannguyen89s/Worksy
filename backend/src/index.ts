@@ -1,3 +1,5 @@
+import "./types/express-augment";
+import http from "http";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -12,7 +14,6 @@ app.listen = ((...args: Parameters<typeof app.listen>) => {
 }) as typeof app.listen;
 
 const PORT = process.env.PORT;
-
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

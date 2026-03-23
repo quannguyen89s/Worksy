@@ -125,12 +125,12 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
           <View style={s.hint}>
             <Text style={s.hintTitle}>Tài khoản test (sau khi seed):</Text>
             <TouchableOpacity
-              onPress={() => { setEmail('customer@worksy.test'); setPassword('123456'); }}>
-              <Text style={s.hintRow}>👤 customer@worksy.test · 123456</Text>
+              onPress={() => { setEmail('duongthidiemvi2004@gmail.com'); setPassword('Password123!'); }}>
+              <Text style={s.hintRow}>👤 duongthidiemvi2004@gmail.com · Password123!</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => { setEmail('worker@worksy.test'); setPassword('123456'); }}>
-              <Text style={s.hintRow}>🔧 worker@worksy.test · 123456</Text>
+              onPress={() => { setEmail('vidtdde180752@fpt.edu.vn'); setPassword('Password123!'); }}>
+              <Text style={s.hintRow}>🔧 vidtdde180752@fpt.edu.vn · Password123!</Text>
             </TouchableOpacity>
           </View>
         </View>

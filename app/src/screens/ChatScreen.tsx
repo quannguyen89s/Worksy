@@ -269,7 +269,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color="#e8e8f0" />
+          <Ionicons name="chevron-back" size={26} color="#F9FAFB" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Avatar name={recipientName} size={38} online={isRecipientOnline} />
@@ -282,10 +282,10 @@ export default function ChatScreen({ navigation, route }: Props) {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="call-outline" size={22} color="#e8e8f0" />
+            <Ionicons name="call-outline" size={22} color="#9CA3AF" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="ellipsis-vertical" size={20} color="#e8e8f0" />
+            <Ionicons name="ellipsis-vertical" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -296,7 +296,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         keyboardVerticalOffset={0}>
 
         {loading ? (
-          <ActivityIndicator color="#6C63FF" style={{ marginTop: 40 }} />
+          <ActivityIndicator color="#C98A00" style={{ marginTop: 40 }} />
         ) : (
           <FlatList
             ref={flatRef}
@@ -327,13 +327,13 @@ export default function ChatScreen({ navigation, route }: Props) {
             onPress={pickImage}
             disabled={sendingImage}>
             {sendingImage
-              ? <ActivityIndicator size="small" color="#6C63FF" />
-              : <Ionicons name="image-outline" size={22} color="#888" />}
+              ? <ActivityIndicator size="small" color="#C98A00" />
+              : <Ionicons name="image-outline" size={22} color="#9CA3AF" />}
           </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn..."
-            placeholderTextColor="#555"
+            placeholderTextColor="#6B7280"
             value={text}
             onChangeText={handleTextChange}
             multiline
@@ -344,7 +344,7 @@ export default function ChatScreen({ navigation, route }: Props) {
             style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
             onPress={sendMessage}
             disabled={!text.trim()}>
-            <Ionicons name="send" size={18} color={text.trim() ? '#fff' : '#555'} />
+            <Ionicons name="send" size={18} color={text.trim() ? '#fff' : '#8A7243'} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -353,23 +353,23 @@ export default function ChatScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0f0f1a' },
+  safe: { flex: 1, backgroundColor: '#111827' },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 10,
-    backgroundColor: '#0f0f1a',
+    backgroundColor: '#1F2937',
     borderBottomWidth: 0.5,
-    borderBottomColor: '#1e1e30',
+    borderBottomColor: '#374151',
   },
   backBtn: { padding: 6 },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 4 },
   headerInfo: { marginLeft: 10 },
-  headerName: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  headerStatus: { fontSize: 12, color: '#4CAF50', marginTop: 1 },
-  headerStatusOffline: { color: '#666' },
+  headerName: { fontSize: 15, fontWeight: '700', color: '#F9FAFB' },
+  headerStatus: { fontSize: 12, color: '#34D399', marginTop: 1 },
+  headerStatusOffline: { color: '#6B7280' },
   headerRight: { flexDirection: 'row' },
   iconBtn: { padding: 8 },
   msgList: { paddingTop: 12, paddingBottom: 8 },
@@ -379,8 +379,8 @@ const styles = StyleSheet.create({
   },
   dateSepText: {
     fontSize: 12,
-    color: '#666',
-    backgroundColor: '#1a1a2e',
+    color: '#9CA3AF',
+    backgroundColor: '#1F2937',
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 12,
@@ -389,29 +389,29 @@ const styles = StyleSheet.create({
   typingRow: { paddingHorizontal: 16, paddingBottom: 6 },
   typingBubble: {
     alignSelf: 'flex-start',
-    backgroundColor: '#2a2a3e',
+    backgroundColor: '#1F2937',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  typingDots: { color: '#9b9bc0', fontSize: 13, letterSpacing: 3 },
+  typingDots: { color: '#9CA3AF', fontSize: 13, letterSpacing: 3 },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: 0.5,
-    borderTopColor: '#1e1e30',
-    backgroundColor: '#0f0f1a',
+    borderTopColor: '#374151',
+    backgroundColor: '#1F2937',
   },
   attachBtn: { padding: 8, marginBottom: 2 },
   input: {
     flex: 1,
-    backgroundColor: '#1e1e30',
+    backgroundColor: '#374151',
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    color: '#e8e8f0',
+    color: '#F9FAFB',
     fontSize: 15,
     maxHeight: 120,
     marginHorizontal: 8,
@@ -420,11 +420,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#C98A00',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
-  sendBtnDisabled: { backgroundColor: '#1e1e30' },
-  empty: { textAlign: 'center', color: '#555', fontSize: 13, marginTop: 40 },
+  sendBtnDisabled: { backgroundColor: '#374151' },
+  empty: { textAlign: 'center', color: '#9CA3AF', fontSize: 13, marginTop: 40 },
 });
