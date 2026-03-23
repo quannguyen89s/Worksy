@@ -8,24 +8,18 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import authService from '@/services/authService';
 import * as SecureStore from 'expo-secure-store';
+import { COLORS } from '@/theme/colors';
+import type { RootStackParamList } from '@/navigation/types';
 
-const COLORS = {
-  bg: '#FFF8E7',
-  card: '#FFFFFF',
-  primary: '#92400E',
-  primaryLight: '#F5E6D3',
-  text: '#3F3F46',
-  textLight: '#71717A',
-  border: '#E4D5C3',
-  error: '#DC2626',
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
-export default function LoginScreen({ navigation }: any) {
+export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,10 +36,13 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       const result = await authService.login(email.trim(), password);
-      // Lưu token
       await SecureStore.setItemAsync('accessToken', result.accessToken);
       await SecureStore.setItemAsync('refreshToken', result.refreshToken);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      if (result.user?.role === 'worker') {
+        navigation.reset({ index: 0, routes: [{ name: 'BrowseJobs' }] });
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
     } catch (error: any) {
       const msg = error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.';
       setErrorMsg(msg);
@@ -55,138 +52,99 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.bg }}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={styles.flex1}
       >
         <ScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow justify-center px-6 py-10"
+          style={styles.flex1}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Logo */}
-          <View className="items-center mb-10">
-            <Text className="text-4xl font-bold" style={{ color: COLORS.primary }}>
-              Worksy
-            </Text>
-            <Text className="text-base mt-2" style={{ color: COLORS.textLight }}>
-              Đăng nhập để tiếp tục
-            </Text>
+          {/* Hero / Logo */}
+          <View style={styles.hero}>
+            <View style={styles.logoWrap}>
+              <Text style={styles.logo}>Worksy</Text>
+              <View style={styles.logoUnderline} />
+            </View>
+            <Text style={styles.subtitle}>Kết nối việc làm — Tạo giá trị</Text>
           </View>
 
           {/* Form Card */}
-          <View
-            className="rounded-2xl p-6"
-            style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border }}
-          >
-            {/* Error message */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Đăng nhập</Text>
+            <Text style={styles.cardHint}>Chào mừng bạn trở lại</Text>
+
             {errorMsg ? (
-              <View className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: '#FEE2E2' }}>
-                <Text className="text-sm" style={{ color: COLORS.error }}>{errorMsg}</Text>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
             ) : null}
 
-            {/* Email */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Email
-            </Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
-              className="rounded-xl px-4 py-3 text-base mb-4"
-              style={{
-                backgroundColor: COLORS.primaryLight,
-                color: COLORS.text,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-              placeholder="Nhập email của bạn"
-              placeholderTextColor={COLORS.textLight}
+              style={styles.input}
+              placeholder="your@email.com"
+              placeholderTextColor={COLORS.textMuted}
               value={email}
-              onChangeText={(text) => { setEmail(text); setErrorMsg(''); }}
+              onChangeText={(t) => { setEmail(t); setErrorMsg(''); }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
 
-            {/* Password */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Mật khẩu
-            </Text>
-            <View className="relative mb-2">
+            <Text style={styles.label}>Mật khẩu</Text>
+            <View style={styles.passwordWrap}>
               <TextInput
-                className="rounded-xl px-4 py-3 text-base pr-16"
-                style={{
-                  backgroundColor: COLORS.primaryLight,
-                  color: COLORS.text,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                }}
-                placeholder="Nhập mật khẩu"
-                placeholderTextColor={COLORS.textLight}
+                style={styles.inputPassword}
+                placeholder="••••••••"
+                placeholderTextColor={COLORS.textMuted}
                 value={password}
-                onChangeText={(text) => { setPassword(text); setErrorMsg(''); }}
+                onChangeText={(t) => { setPassword(t); setErrorMsg(''); }}
                 secureTextEntry={!showPassword}
               />
               <TouchableOpacity
-                className="absolute right-3 top-3"
+                style={styles.togglePass}
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                  {showPassword ? 'Ẩn' : 'Hiện'}
-                </Text>
+                <Text style={styles.togglePassText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Forgot Password */}
-            <TouchableOpacity className="self-end mb-6">
-              <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                Quên mật khẩu?
-              </Text>
+            <TouchableOpacity style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
-            {/* Login Button */}
             <TouchableOpacity
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: loading ? '#B45309' : COLORS.primary }}
+              style={[styles.btnPrimary, loading && styles.btnPrimaryDisabled]}
               onPress={handleLogin}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text className="text-white text-base font-semibold">Đăng nhập</Text>
+                <Text style={styles.btnPrimaryText}>Đăng nhập</Text>
               )}
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View className="flex-row items-center my-5">
-              <View className="flex-1 h-px" style={{ backgroundColor: COLORS.border }} />
-              <Text className="mx-3 text-sm" style={{ color: COLORS.textLight }}>hoặc</Text>
-              <View className="flex-1 h-px" style={{ backgroundColor: COLORS.border }} />
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>hoặc</Text>
+              <View style={styles.dividerLine} />
             </View>
 
-            {/* Google Login */}
-            <TouchableOpacity
-              className="rounded-xl py-4 items-center flex-row justify-center"
-              style={{ backgroundColor: COLORS.primaryLight, borderWidth: 1, borderColor: COLORS.border }}
-              activeOpacity={0.8}
-            >
-              <Text className="text-lg mr-2">G</Text>
-              <Text className="text-base font-medium" style={{ color: COLORS.text }}>
-                Đăng nhập bằng Google
-              </Text>
+            <TouchableOpacity style={styles.btnGoogle} activeOpacity={0.85}>
+              <Text style={styles.btnGoogleIcon}>G</Text>
+              <Text style={styles.btnGoogleText}>Đăng nhập bằng Google</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Register Link */}
-          <View className="flex-row justify-center mt-6">
-            <Text className="text-sm" style={{ color: COLORS.textLight }}>
-              Chưa có tài khoản?{' '}
-            </Text>
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>Chưa có tài khoản? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text className="text-sm font-semibold" style={{ color: COLORS.primary }}>
-                Đăng ký ngay
-              </Text>
+              <Text style={styles.registerLink}>Đăng ký ngay</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -194,3 +152,110 @@ export default function LoginScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  flex1: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 32, paddingBottom: 48 },
+  hero: { alignItems: 'center', marginBottom: 32 },
+  logoWrap: { position: 'relative', marginBottom: 8 },
+  logo: { fontSize: 42, fontWeight: '800', color: COLORS.primary, letterSpacing: -0.5 },
+  logoUnderline: {
+    position: 'absolute',
+    bottom: -4,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: 2,
+    opacity: 0.8,
+  },
+  subtitle: { fontSize: 15, color: COLORS.textSecondary },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  cardTitle: { fontSize: 22, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  cardHint: { fontSize: 14, color: COLORS.textMuted, marginBottom: 20 },
+  errorBox: {
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+  },
+  errorText: { fontSize: 14, color: COLORS.error, fontWeight: '500' },
+  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+  input: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 16,
+  },
+  passwordWrap: { position: 'relative', marginBottom: 12 },
+  inputPassword: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    paddingRight: 72,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  togglePass: { position: 'absolute', right: 16, top: 14 },
+  togglePassText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+  forgotBtn: { alignSelf: 'flex-end', marginBottom: 20 },
+  forgotText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  btnPrimaryDisabled: { opacity: 0.85 },
+  btnPrimaryText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
+  dividerText: { marginHorizontal: 16, fontSize: 13, color: COLORS.textMuted },
+  btnGoogle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: '#FAFAF9',
+  },
+  btnGoogleIcon: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#4285F4',
+    marginRight: 10,
+  },
+  btnGoogleText: { fontSize: 16, fontWeight: '600', color: COLORS.text },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  registerText: { fontSize: 15, color: COLORS.textMuted },
+  registerLink: { fontSize: 15, fontWeight: '700', color: COLORS.primary },
+});

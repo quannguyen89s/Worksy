@@ -10,6 +10,10 @@ import {
 import { AppError } from "../utils/AppError";
 import { emitJobNearby } from "../sockets/emitters";
 
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function jobPoint(job: { location?: { lat?: number; lng?: number } | null }) {
   return {
     lat: job.location?.lat ?? 0,
@@ -31,6 +35,105 @@ function syncJobStatus(doc: {
   } else {
     doc.status = "open";
   }
+}
+
+export type WorkerBrowseFilters = {
+  search?: string;
+  status?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  skillTags?: string[];
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  sort?: "price_asc" | "price_desc" | "date_desc" | "date_asc" | "distance";
+  page?: number;
+  limit?: number;
+};
+
+export async function listJobsForWorker(filters: WorkerBrowseFilters) {
+  const {
+    search,
+    status = ["open", "partial", "full"],
+    minPrice,
+    maxPrice,
+    skillTags,
+    lat,
+    lng,
+    radiusKm = 10,
+    sort = "date_desc",
+    page = 1,
+    limit = 20,
+  } = filters;
+
+  const query: Record<string, unknown> = {};
+
+  // Chỉ hiển thị job đang tuyển (không pending, không done)
+  query.status = { $in: status };
+
+  if (search?.trim()) {
+    const keyword = search.trim();
+    const regex = new RegExp(escapeRegex(keyword), "i");
+    query.$or = [
+      { title: regex },
+      { description: regex },
+      { skillTags: regex },
+    ];
+  }
+
+  if (minPrice != null && maxPrice != null && Number.isFinite(minPrice) && Number.isFinite(maxPrice)) {
+    query.price = { $gte: minPrice, $lte: maxPrice };
+  } else if (minPrice != null && Number.isFinite(minPrice)) {
+    query.price = { $gte: minPrice };
+  } else if (maxPrice != null && Number.isFinite(maxPrice)) {
+    query.price = { $lte: maxPrice };
+  }
+
+  if (skillTags?.length) {
+    const tags = skillTags.filter(Boolean).map((s) => s.trim());
+    if (tags.length) {
+      query.skillTags = { $in: tags };
+    }
+  }
+
+  let jobs = await jobModel.find(query).sort({ createdAt: -1 }).lean();
+
+  // Lọc theo khoảng cách nếu có lat, lng
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const userPoint = { lat: lat!, lng: lng! };
+    jobs = jobs
+      .map((j) => {
+        const jl = jobPoint(j);
+        const distanceKm = haversineKm(userPoint, jl);
+        return { ...j, distanceKm };
+      })
+      .filter((j) => j.distanceKm <= radiusKm);
+  }
+
+  // Sort
+  if (sort === "price_asc") {
+    jobs.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+  } else if (sort === "price_desc") {
+    jobs.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+  } else if (sort === "date_asc") {
+    jobs.sort(
+      (a, b) =>
+        new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(),
+    );
+  } else if (sort === "date_desc") {
+    jobs.sort(
+      (a, b) =>
+        new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+    );
+  } else if (sort === "distance" && Number.isFinite(lat) && Number.isFinite(lng)) {
+    jobs.sort((a, b) => ((a as { distanceKm?: number }).distanceKm ?? 999) - ((b as { distanceKm?: number }).distanceKm ?? 999));
+  }
+
+  const total = jobs.length;
+  const skip = Math.max(0, (page - 1) * limit);
+  const paginated = jobs.slice(skip, skip + limit);
+
+  return { data: paginated, total, page, limit };
 }
 
 export async function listJobsNearby(

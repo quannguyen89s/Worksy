@@ -40,7 +40,7 @@ const jobSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "open", "partial", "full", "done"],
+      enum: ["pending", "open", "full", "done"],
       default: "pending",
     },
     createdBy: {
