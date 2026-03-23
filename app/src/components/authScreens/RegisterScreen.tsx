@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator,
+  Platform, ScrollView, ActivityIndicator, Animated, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Toast } from '@/components/ToastProvider';
 import authService from '@/services/authService';
 
+const ACCENT = '#92400E';
+const ACCENT_LIGHT = '#D97706';
+
 export default function RegisterScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +25,16 @@ export default function RegisterScreen({ navigation }: any) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused] = useState(false);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
@@ -52,128 +66,244 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8E7' }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-        <ScrollView className="flex-1" contentContainerClassName="flex-grow justify-center px-8 py-16" keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1, backgroundColor: '#1C0A00' }}>
+      <StatusBar barStyle="light-content" />
 
-          <View className="items-center mb-8">
-            <Text className="text-9xl font-extrabold tracking-tight text-center mb-6" style={{ color: '#92400E' }}>
-              Worksy
+      {/* Hero header */}
+      <LinearGradient
+        colors={['#1C0A00', '#3B1505', '#78350F']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={{ paddingTop: insets.top + 16, paddingBottom: 44, paddingHorizontal: 28 }}
+      >
+        {/* Decorative blobs */}
+        <View style={{
+          position: 'absolute', bottom: -20, right: -20,
+          width: 160, height: 160, borderRadius: 80,
+          backgroundColor: 'rgba(180,83,9,0.2)',
+        }} />
+
+        {/* Back button */}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            alignItems: 'center', justifyContent: 'center',
+            marginBottom: 24,
+          }}
+        >
+          <Ionicons name="arrow-back" size={20} color="#fff" />
+        </TouchableOpacity>
+
+        {/* Heading */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <View style={{
+            width: 40, height: 40, borderRadius: 12,
+            backgroundColor: '#D97706', alignItems: 'center', justifyContent: 'center',
+            marginRight: 12,
+          }}>
+            <Ionicons name="briefcase" size={20} color="#fff" />
+          </View>
+          <Text style={{ fontSize: 30, fontWeight: '800', color: '#fff', letterSpacing: -0.5 }}>
+            Worksy
+          </Text>
+        </View>
+
+        <Text style={{ fontSize: 26, fontWeight: '700', color: '#fff', marginTop: 20, lineHeight: 34 }}>
+          Create account ✨
+        </Text>
+        <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>
+          Join thousands finding their dream jobs
+        </Text>
+      </LinearGradient>
+
+      {/* Form */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+          <ScrollView
+            style={{
+              flex: 1, backgroundColor: '#fff',
+              borderTopLeftRadius: 32, borderTopRightRadius: 32,
+              marginTop: -24,
+            }}
+            contentContainerStyle={{ padding: 28, paddingBottom: 40 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Handle bar */}
+            <View style={{
+              width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB',
+              alignSelf: 'center', marginBottom: 28,
+            }} />
+
+            {/* Step indicator */}
+            <View style={{ flexDirection: 'row', marginBottom: 24, gap: 6 }}>
+              {[1, 2, 3].map((s) => (
+                <View key={s} style={{
+                  flex: s === 1 ? 2 : 1, height: 4, borderRadius: 2,
+                  backgroundColor: s === 1 ? ACCENT_LIGHT : '#F3F4F6',
+                }} />
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 20 }}>
+              Personal details
             </Text>
-            <Text className="text-xl font-bold text-gray-500 mt-5">Create a new account</Text>
-          </View>
 
-          {/* Name */}
-          <View className="mb-10">
-            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Full Name</Text>
-            <View
-              className="flex-row items-center gap-3 pb-2.5"
-              style={{ borderBottomWidth: 1.5, borderBottomColor: nameFocused ? '#92400E' : '#E5E7EB' }}
-            >
-              <Ionicons name="person-outline" size={20} color={nameFocused ? '#92400E' : '#B0B0B0'} />
-              <TextInput
-                className="flex-1 text-xl text-gray-800 p-0"
-                placeholder="Enter your full name"
-                placeholderTextColor="#B0B0B0"
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setNameFocused(true)}
-                onBlur={() => setNameFocused(false)}
-              />
-            </View>
-          </View>
+            {/* Name */}
+            <InputField
+              label="Full Name"
+              icon="person-outline"
+              placeholder="John Smith"
+              value={name}
+              onChangeText={setName}
+              focused={nameFocused}
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => setNameFocused(false)}
+              autoCapitalize="words"
+            />
 
-          {/* Email */}
-          <View className="mb-10">
-            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Email</Text>
-            <View
-              className="flex-row items-center gap-3 pb-2.5"
-              style={{ borderBottomWidth: 1.5, borderBottomColor: emailFocused ? '#92400E' : '#E5E7EB' }}
-            >
-              <Ionicons name="mail-outline" size={20} color={emailFocused ? '#92400E' : '#B0B0B0'} />
-              <TextInput
-                className="flex-1 text-xl text-gray-800 p-0"
-                placeholder="Enter your email"
-                placeholderTextColor="#B0B0B0"
-                value={email}
-                onChangeText={setEmail}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
+            {/* Email */}
+            <InputField
+              label="Email"
+              icon="mail-outline"
+              placeholder="your@email.com"
+              value={email}
+              onChangeText={setEmail}
+              focused={emailFocused}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+              keyboardType="email-address"
+            />
 
-          {/* Password */}
-          <View className="mb-10">
-            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Password</Text>
-            <View
-              className="flex-row items-center gap-3 pb-2.5"
-              style={{ borderBottomWidth: 1.5, borderBottomColor: passwordFocused ? '#92400E' : '#E5E7EB' }}
-            >
-              <Ionicons name="lock-closed-outline" size={20} color={passwordFocused ? '#92400E' : '#B0B0B0'} />
-              <TextInput
-                className="flex-1 text-xl text-gray-800 p-0"
-                placeholder="Min 6 chars, uppercase & number"
-                placeholderTextColor="#B0B0B0"
-                value={password}
-                onChangeText={setPassword}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#B0B0B0" />
-              </TouchableOpacity>
-            </View>
-          </View>
+            {/* Password */}
+            <InputField
+              label="Password"
+              icon="lock-closed-outline"
+              placeholder="Min 6 chars, 1 uppercase, 1 number"
+              value={password}
+              onChangeText={setPassword}
+              focused={passwordFocused}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+              secureTextEntry={!showPassword}
+              rightAction={
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              }
+            />
 
-          {/* Confirm Password */}
-          <View className="mb-10">
-            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Confirm Password</Text>
-            <View
-              className="flex-row items-center gap-3 pb-2.5"
-              style={{ borderBottomWidth: 1.5, borderBottomColor: confirmFocused ? '#92400E' : '#E5E7EB' }}
-            >
-              <Ionicons name="lock-closed-outline" size={20} color={confirmFocused ? '#92400E' : '#B0B0B0'} />
-              <TextInput
-                className="flex-1 text-xl text-gray-800 p-0"
-                placeholder="Re-enter your password"
-                placeholderTextColor="#B0B0B0"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                onFocus={() => setConfirmFocused(true)}
-                onBlur={() => setConfirmFocused(false)}
-                secureTextEntry={!showConfirmPassword}
-              />
-              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#B0B0B0" />
-              </TouchableOpacity>
-            </View>
-          </View>
+            {/* Confirm Password */}
+            <InputField
+              label="Confirm Password"
+              icon="shield-checkmark-outline"
+              placeholder="Re-enter your password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              focused={confirmFocused}
+              onFocus={() => setConfirmFocused(true)}
+              onBlur={() => setConfirmFocused(false)}
+              secureTextEntry={!showConfirmPassword}
+              rightAction={
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              }
+            />
 
-          <TouchableOpacity onPress={handleRegister} activeOpacity={0.85} disabled={loading}>
-            <LinearGradient
-              colors={['#B45309', '#92400E', '#78350F']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              className="rounded-full py-4 items-center"
-            >
-              {loading ? <ActivityIndicator color="#fff" /> : (
-                <Text className="text-white text-base font-extrabold tracking-widest">SIGN UP</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <View className="items-center mt-8">
-            <Text className="text-md text-gray-400 mb-2">Already have an account?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text className="text-md mt-3 font-extrabold tracking-wide" style={{ color: '#92400E' }}>SIGN IN</Text>
+            {/* Register Button */}
+            <TouchableOpacity onPress={handleRegister} activeOpacity={0.85} disabled={loading}>
+              <LinearGradient
+                colors={['#D97706', '#B45309', '#92400E']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{
+                  height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+                  shadowColor: '#B45309', shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
+                  marginBottom: 28,
+                }}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.5 }}>
+                    Create Account
+                  </Text>
+                }
+              </LinearGradient>
             </TouchableOpacity>
-          </View>
 
-        </ScrollView>
+            {/* Terms */}
+            <Text style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginBottom: 20, lineHeight: 18 }}>
+              By creating an account, you agree to our{' '}
+              <Text style={{ color: ACCENT, fontWeight: '600' }}>Terms of Service</Text>
+              {' '}and{' '}
+              <Text style={{ color: ACCENT, fontWeight: '600' }}>Privacy Policy</Text>
+            </Text>
+
+            {/* Sign in link */}
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, color: '#9CA3AF' }}>
+                Already have an account?{' '}
+                <Text
+                  style={{ color: ACCENT, fontWeight: '700' }}
+                  onPress={() => navigation.navigate('Login')}
+                >
+                  Sign In
+                </Text>
+              </Text>
+            </View>
+
+          </ScrollView>
+        </Animated.View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
+  );
+}
+
+function InputField({
+  label, icon, placeholder, value, onChangeText,
+  focused, onFocus, onBlur, secureTextEntry, rightAction, keyboardType, autoCapitalize,
+}: {
+  label: string; icon: any; placeholder: string;
+  value: string; onChangeText: (t: string) => void;
+  focused: boolean; onFocus: () => void; onBlur: () => void;
+  secureTextEntry?: boolean; rightAction?: React.ReactNode;
+  keyboardType?: any; autoCapitalize?: any;
+}) {
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: '#6B7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+        {label}
+      </Text>
+      <View style={{
+        flexDirection: 'row', alignItems: 'center',
+        height: 56, borderRadius: 16, paddingHorizontal: 14,
+        backgroundColor: focused ? '#FFFBEB' : '#F9FAFB',
+        borderWidth: 1.5,
+        borderColor: focused ? '#D97706' : '#F3F4F6',
+      }}>
+        <View style={{
+          width: 32, height: 32, borderRadius: 10,
+          backgroundColor: focused ? '#FEF3C7' : '#F3F4F6',
+          alignItems: 'center', justifyContent: 'center', marginRight: 12,
+        }}>
+          <Ionicons name={icon} size={16} color={focused ? '#92400E' : '#9CA3AF'} />
+        </View>
+        <TextInput
+          style={{ flex: 1, fontSize: 15, color: '#111827', padding: 0 }}
+          placeholder={placeholder}
+          placeholderTextColor="#C0C0C0"
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType ?? 'default'}
+          autoCapitalize={autoCapitalize ?? 'none'}
+        />
+        {rightAction}
+      </View>
+    </View>
   );
 }
