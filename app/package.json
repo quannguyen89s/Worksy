@@ -2,9 +2,9 @@
   "name": "Worksy",
   "version": "1.0.0",
   "scripts": {
-    "android": "expo start --android --lan",
-    "ios": "expo start --ios --lan",
-    "start": "expo start --lan",
+    "android": "expo start --android --go --lan",
+    "ios": "expo start --ios --go --lan",
+    "start": "expo start --go --lan",
     "prebuild": "expo prebuild",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
@@ -34,7 +34,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@expo/ngrok": "^4.1.0",
     "@types/react": "~19.1.10",
+    "cross-env": "^10.1.0",
     "eslint": "^9.25.1",
     "eslint-config-expo": "~10.0.0",
     "eslint-config-prettier": "^10.1.2",

@@ -13,8 +13,7 @@ const generateOTP = (): string => {
 }
 
 export const loginService = async (email: string, password: string) => {
-    // select('+password') required because password has select:false in schema
-    const user = await userModel.findOne({ email }).select('+password');
+    const user = await userModel.findOne({ email }).select("+password");
     if (!user) {
         throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
@@ -32,10 +31,21 @@ export const loginService = async (email: string, password: string) => {
         signAccessToken(user._id.toString(), user.role),
         signRefreshToken(user._id.toString(), user.role),
     ]);
-    // Use updateOne to avoid re-validating password (select:false)
-    await userModel.updateOne({ _id: user._id }, { refreshToken });
+    user.refreshToken = refreshToken;
+    await user.save();
 
-    return { message: USER_MESSAGE.LOGIN_SUCCESSFUL, accessToken, refreshToken };
+    return {
+        message: USER_MESSAGE.LOGIN_SUCCESSFUL,
+        accessToken,
+        refreshToken,
+        user: {
+            _id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar ?? null,
+        },
+    };
 }
 
 export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {

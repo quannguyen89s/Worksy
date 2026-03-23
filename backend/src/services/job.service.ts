@@ -79,15 +79,20 @@ export async function createJob(
     createdBy: customerId,
     assignedWorkers: 0,
     assignedWorkerIds: [],
-    status: "open",
+    status: "pending",
   });
   const id = String(job._id);
-  void emitJobNearby(id, body.location, 10);
+  const dbName = mongoose.connection.db?.databaseName ?? "?";
+  console.log("[createJob] Saved job (pending):", id, "| database:", dbName);
   return job.toObject();
 }
 
 export async function listMyJobs(customerId: string) {
   return jobModel.find({ createdBy: customerId }).sort({ createdAt: -1 }).lean();
+}
+
+export async function listPendingJobs() {
+  return jobModel.find({ status: "pending" }).sort({ createdAt: -1 }).lean();
 }
 
 export async function listRecommendedJobs(
@@ -244,6 +249,82 @@ export async function selectWorkers(
   } finally {
     session.endSession();
   }
+}
+
+export async function approveJob(jobId: string) {
+  const job = await jobModel.findById(jobId);
+  if (!job) throw new AppError("Job not found", 404);
+  if (job.status !== "pending") {
+    throw new AppError("Chỉ tin pending mới được duyệt", 400);
+  }
+  job.status = "open";
+  await job.save();
+  const id = String(job._id);
+  const loc = job.location ?? { lat: 0, lng: 0 };
+  void emitJobNearby(id, loc, 10);
+  return job.toObject();
+}
+
+export async function updateJob(
+  jobId: string,
+  customerId: string,
+  body: {
+    title?: string;
+    description?: string;
+    price?: number;
+    location?: { lat: number; lng: number };
+    requiredWorkers?: number;
+    skillTags?: string[];
+  },
+) {
+  const job = await jobModel.findById(jobId);
+  if (!job) throw new AppError("Job not found", 404);
+  if (String(job.createdBy) !== customerId) {
+    throw new AppError("Forbidden", 403);
+  }
+  if (job.status === "pending") {
+    throw new AppError("Tin chưa được admin duyệt, không thể chỉnh sửa", 400);
+  }
+  if (job.status !== "open" || job.assignedWorkers > 0) {
+    throw new AppError(
+      "Job can only be updated when status is open and no workers assigned",
+      400,
+    );
+  }
+  if (body.price !== undefined && body.price < 0) {
+    throw new AppError("Price must be >= 0", 400);
+  }
+  if (body.requiredWorkers !== undefined && body.requiredWorkers < 1) {
+    throw new AppError("requiredWorkers must be >= 1", 400);
+  }
+  if (body.title !== undefined) job.title = body.title;
+  if (body.description !== undefined) job.description = body.description;
+  if (body.price !== undefined) job.price = body.price;
+  if (body.location !== undefined) job.location = body.location;
+  if (body.requiredWorkers !== undefined) job.requiredWorkers = body.requiredWorkers;
+  if (body.skillTags !== undefined) job.skillTags = body.skillTags;
+  await job.save();
+  return job.toObject();
+}
+
+export async function deleteJob(jobId: string, customerId: string) {
+  const job = await jobModel.findById(jobId);
+  if (!job) throw new AppError("Job not found", 404);
+  if (String(job.createdBy) !== customerId) {
+    throw new AppError("Forbidden", 403);
+  }
+  if (job.status === "pending") {
+    throw new AppError("Tin chưa được admin duyệt. Chỉ xóa được sau khi admin duyệt", 400);
+  }
+  if (job.status !== "open" || job.assignedWorkers > 0) {
+    throw new AppError(
+      "Job can only be deleted when status is open and no workers assigned",
+      400,
+    );
+  }
+  await applicationModel.deleteMany({ jobId });
+  await job.deleteOne();
+  return { deleted: true, id: jobId };
 }
 
 export async function completeJob(jobId: string, customerId: string) {

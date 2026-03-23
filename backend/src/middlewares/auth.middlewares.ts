@@ -15,12 +15,9 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
         if (err) {
             return res.status(403).json({ message: USER_MESSAGE.INVALID_TOKEN });
         }
-        const decoded = user as unknown as { _id?: string; id?: string; role?: string; name?: string };
-        req.user = {
-            id: String(decoded._id ?? decoded.id ?? ""),
-            role: String(decoded.role ?? ""),
-            name: String(decoded.name ?? ""),
-        };
+        const decoded = user as { _id: string; role: string };
+        req.user = { id: decoded._id as string, role: decoded.role as string, name: '' 
+          };
         next();
     });
 }
@@ -40,11 +37,11 @@ export const authorizeToken = (...roles: string[]) => {
             if (!roles.includes(String(decoded.role ?? ""))) {
                 return res.status(403).json({ message: USER_MESSAGE.UNAUTHORIZED });
             }
-            req.user = {
-                id: String(decoded._id ?? decoded.id ?? ""),
-                role: String(decoded.role ?? ""),
-                name: String(decoded.name ?? ""),
-            };
+            req.user = { 
+                id: decoded._id as string, 
+                role: decoded.role as string, 
+                name: '' 
+              };
             next();
         });
     };

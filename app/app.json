@@ -3,6 +3,9 @@
     "name": "Worksy",
     "slug": "Worksy",
     "version": "1.0.0",
+    "updates": {
+      "enabled": false
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },

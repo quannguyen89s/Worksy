@@ -18,13 +18,12 @@ import "./models/application.model";
 
 const app = express();
 
-connectDB();
 app.use(cors(getCorsOptions()));
 app.use(json({ limit: '20mb' }));
 app.use(urlencoded({ extended: true, limit: '20mb' }));
 
 app.get("/", (_req: Request, res: Response) => {
-  res.json("Connect succesfull");
+  res.json("Connect successful");
 });
 
 app.use("/auth", authRouter);

@@ -27,8 +27,7 @@ export const loginController = async (req: Request<ParamsDictionary, any, LoginR
 
 export const logoutController = async (req: Request, res: Response) => {
     try {
-        const userId = req.user?.id ?? "";
-        const result = await logoutService(userId);
+        const result = await logoutService(req.user!.id);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
         return handleError(error, res);
