@@ -1,28 +1,13 @@
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView,
+  Platform, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Toast } from '@/components/ToastProvider';
 import authService from '@/services/authService';
-
-const COLORS = {
-  bg: '#FFF8E7',
-  card: '#FFFFFF',
-  primary: '#92400E',
-  primaryLight: '#F5E6D3',
-  text: '#3F3F46',
-  textLight: '#71717A',
-  border: '#E4D5C3',
-  error: '#DC2626',
-  success: '#16A34A',
-};
 
 export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState('');
@@ -32,216 +17,161 @@ export default function RegisterScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-
-  const clearError = () => setErrorMsg('');
+  const [nameFocused, setNameFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmFocused, setConfirmFocused] = useState(false);
 
   const handleRegister = async () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      setErrorMsg('Vui lòng nhập đầy đủ thông tin');
-      return;
+      Toast.show({ type: 'error', title: 'Error', message: 'Please fill in all fields.' }); return;
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Mật khẩu xác nhận không khớp');
-      return;
+      Toast.show({ type: 'error', title: 'Error', message: 'Passwords do not match.' }); return;
     }
     if (password.length < 6) {
-      setErrorMsg('Mật khẩu phải có ít nhất 6 ký tự');
-      return;
+      Toast.show({ type: 'error', title: 'Error', message: 'Password must be at least 6 characters.' }); return;
     }
     if (!/[A-Z]/.test(password)) {
-      setErrorMsg('Mật khẩu phải có ít nhất 1 chữ hoa');
-      return;
+      Toast.show({ type: 'error', title: 'Error', message: 'Password must contain at least 1 uppercase letter.' }); return;
     }
     if (!/[0-9]/.test(password)) {
-      setErrorMsg('Mật khẩu phải có ít nhất 1 số');
-      return;
+      Toast.show({ type: 'error', title: 'Error', message: 'Password must contain at least 1 number.' }); return;
     }
 
     setLoading(true);
     try {
       await authService.register(name.trim(), email.trim(), password, confirmPassword);
-      setSuccessMsg('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
+      Toast.show({ type: 'success', title: 'Success', message: 'Registration successful! Please check your email to verify.' });
+      setTimeout(() => navigation.navigate('Login'), 2000);
     } catch (error: any) {
-      const msg = error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
-      setErrorMsg(msg);
+      Toast.show({ type: 'error', title: 'Registration Failed', message: error.response?.data?.message || 'Please try again.' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.bg }}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
-      >
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow justify-center px-6 py-10"
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Logo */}
-          <View className="items-center mb-10">
-            <Text className="text-4xl font-bold" style={{ color: COLORS.primary }}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8E7' }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <ScrollView className="flex-1" contentContainerClassName="flex-grow justify-center px-8 py-16" keyboardShouldPersistTaps="handled">
+
+          <View className="items-center mb-8">
+            <Text className="text-9xl font-extrabold tracking-tight text-center mb-6" style={{ color: '#92400E' }}>
               Worksy
             </Text>
-            <Text className="text-base mt-2" style={{ color: COLORS.textLight }}>
-              Tạo tài khoản mới
-            </Text>
+            <Text className="text-xl font-bold text-gray-500 mt-5">Create a new account</Text>
           </View>
 
-          {/* Form Card */}
-          <View
-            className="rounded-2xl p-6"
-            style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border }}
-          >
-            {/* Error message */}
-            {errorMsg ? (
-              <View className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: '#FEE2E2' }}>
-                <Text className="text-sm" style={{ color: COLORS.error }}>{errorMsg}</Text>
-              </View>
-            ) : null}
-
-            {/* Success message */}
-            {successMsg ? (
-              <View className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: '#DCFCE7' }}>
-                <Text className="text-sm" style={{ color: COLORS.success }}>{successMsg}</Text>
-                <TouchableOpacity className="mt-2" onPress={() => navigation.navigate('Login')}>
-                  <Text className="text-sm font-semibold" style={{ color: COLORS.primary }}>
-                    ← Về trang đăng nhập
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            {/* Name */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Họ và tên
-            </Text>
-            <TextInput
-              className="rounded-xl px-4 py-3 text-base mb-4"
-              style={{
-                backgroundColor: COLORS.primaryLight,
-                color: COLORS.text,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-              placeholder="Nhập họ và tên"
-              placeholderTextColor={COLORS.textLight}
-              value={name}
-              onChangeText={(text) => { setName(text); clearError(); }}
-            />
-
-            {/* Email */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Email
-            </Text>
-            <TextInput
-              className="rounded-xl px-4 py-3 text-base mb-4"
-              style={{
-                backgroundColor: COLORS.primaryLight,
-                color: COLORS.text,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-              placeholder="Nhập email của bạn"
-              placeholderTextColor={COLORS.textLight}
-              value={email}
-              onChangeText={(text) => { setEmail(text); clearError(); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
-            {/* Password */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Mật khẩu
-            </Text>
-            <View className="relative mb-4">
+          {/* Name */}
+          <View className="mb-10">
+            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Full Name</Text>
+            <View
+              className="flex-row items-center gap-3 pb-2.5"
+              style={{ borderBottomWidth: 1.5, borderBottomColor: nameFocused ? '#92400E' : '#E5E7EB' }}
+            >
+              <Ionicons name="person-outline" size={20} color={nameFocused ? '#92400E' : '#B0B0B0'} />
               <TextInput
-                className="rounded-xl px-4 py-3 text-base pr-16"
-                style={{
-                  backgroundColor: COLORS.primaryLight,
-                  color: COLORS.text,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                }}
-                placeholder="Tối thiểu 6 ký tự, có chữ hoa và số"
-                placeholderTextColor={COLORS.textLight}
+                className="flex-1 text-xl text-gray-800 p-0"
+                placeholder="Enter your full name"
+                placeholderTextColor="#B0B0B0"
+                value={name}
+                onChangeText={setName}
+                onFocus={() => setNameFocused(true)}
+                onBlur={() => setNameFocused(false)}
+              />
+            </View>
+          </View>
+
+          {/* Email */}
+          <View className="mb-10">
+            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Email</Text>
+            <View
+              className="flex-row items-center gap-3 pb-2.5"
+              style={{ borderBottomWidth: 1.5, borderBottomColor: emailFocused ? '#92400E' : '#E5E7EB' }}
+            >
+              <Ionicons name="mail-outline" size={20} color={emailFocused ? '#92400E' : '#B0B0B0'} />
+              <TextInput
+                className="flex-1 text-xl text-gray-800 p-0"
+                placeholder="Enter your email"
+                placeholderTextColor="#B0B0B0"
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          {/* Password */}
+          <View className="mb-10">
+            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Password</Text>
+            <View
+              className="flex-row items-center gap-3 pb-2.5"
+              style={{ borderBottomWidth: 1.5, borderBottomColor: passwordFocused ? '#92400E' : '#E5E7EB' }}
+            >
+              <Ionicons name="lock-closed-outline" size={20} color={passwordFocused ? '#92400E' : '#B0B0B0'} />
+              <TextInput
+                className="flex-1 text-xl text-gray-800 p-0"
+                placeholder="Min 6 chars, uppercase & number"
+                placeholderTextColor="#B0B0B0"
                 value={password}
-                onChangeText={(text) => { setPassword(text); clearError(); }}
+                onChangeText={setPassword}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3"
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                  {showPassword ? 'Ẩn' : 'Hiện'}
-                </Text>
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#B0B0B0" />
               </TouchableOpacity>
             </View>
+          </View>
 
-            {/* Confirm Password */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Xác nhận mật khẩu
-            </Text>
-            <View className="relative mb-6">
+          {/* Confirm Password */}
+          <View className="mb-10">
+            <Text className="text-md font-semibold text-gray-500 mb-2 uppercase tracking-wider">Confirm Password</Text>
+            <View
+              className="flex-row items-center gap-3 pb-2.5"
+              style={{ borderBottomWidth: 1.5, borderBottomColor: confirmFocused ? '#92400E' : '#E5E7EB' }}
+            >
+              <Ionicons name="lock-closed-outline" size={20} color={confirmFocused ? '#92400E' : '#B0B0B0'} />
               <TextInput
-                className="rounded-xl px-4 py-3 text-base pr-16"
-                style={{
-                  backgroundColor: COLORS.primaryLight,
-                  color: COLORS.text,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                }}
-                placeholder="Nhập lại mật khẩu"
-                placeholderTextColor={COLORS.textLight}
+                className="flex-1 text-xl text-gray-800 p-0"
+                placeholder="Re-enter your password"
+                placeholderTextColor="#B0B0B0"
                 value={confirmPassword}
-                onChangeText={(text) => { setConfirmPassword(text); clearError(); }}
+                onChangeText={setConfirmPassword}
+                onFocus={() => setConfirmFocused(true)}
+                onBlur={() => setConfirmFocused(false)}
                 secureTextEntry={!showConfirmPassword}
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3"
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                  {showConfirmPassword ? 'Ẩn' : 'Hiện'}
-                </Text>
+              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#B0B0B0" />
               </TouchableOpacity>
             </View>
+          </View>
 
-            {/* Register Button */}
-            <TouchableOpacity
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: loading ? '#B45309' : COLORS.primary }}
-              onPress={handleRegister}
-              activeOpacity={0.8}
-              disabled={loading}
+          <TouchableOpacity onPress={handleRegister} activeOpacity={0.85} disabled={loading}>
+            <LinearGradient
+              colors={['#B45309', '#92400E', '#78350F']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              className="rounded-full py-4 items-center"
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white text-base font-semibold">Đăng ký</Text>
+              {loading ? <ActivityIndicator color="#fff" /> : (
+                <Text className="text-white text-base font-extrabold tracking-widest">SIGN UP</Text>
               )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View className="items-center mt-8">
+            <Text className="text-md text-gray-400 mb-2">Already have an account?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text className="text-md mt-3 font-extrabold tracking-wide" style={{ color: '#92400E' }}>SIGN IN</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Login Link */}
-          <View className="flex-row justify-center mt-6">
-            <Text className="text-sm" style={{ color: COLORS.textLight }}>
-              Đã có tài khoản?{' '}
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text className="text-sm font-semibold" style={{ color: COLORS.primary }}>
-                Đăng nhập
-              </Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
