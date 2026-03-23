@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from '@/api/config';
 
 const api = axios.create({
@@ -9,9 +10,25 @@ const api = axios.create({
   },
 });
 
+export async function getStoredUser() {
+  const raw = await AsyncStorage.getItem('user');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export const authService = {
   login: async (email: string, password: string) => {
     const response = await api.post('/login', { email, password });
+    const { accessToken, refreshToken, user } = response.data;
+    await AsyncStorage.multiSet([
+      ['token', accessToken],
+      ['refreshToken', refreshToken],
+      ['user', JSON.stringify(user)],
+    ]);
     return response.data;
   },
 
@@ -24,11 +41,18 @@ export const authService = {
     const response = await api.post('/logout', {}, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+    await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
     return response.data;
   },
 
   googleLogin: async (idToken: string) => {
     const response = await api.post('/google-login', { idToken });
+    const { accessToken, refreshToken, user } = response.data;
+    await AsyncStorage.multiSet([
+      ['token', accessToken],
+      ['refreshToken', refreshToken],
+      ['user', JSON.stringify(user)],
+    ]);
     return response.data;
   },
 };

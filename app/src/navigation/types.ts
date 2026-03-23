@@ -6,6 +6,8 @@ export type RootStackParamList = {
   MyJobs: undefined;
   WorkerApplies: undefined;
   Notifications: undefined;
+  Messages: undefined;
+  Chat: { conversationId: string; recipientName: string; recipientId: string };
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminJobs: undefined;

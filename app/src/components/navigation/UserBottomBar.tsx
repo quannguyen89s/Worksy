@@ -1,18 +1,17 @@
 import type { RootStackParamList } from '@/navigation/types';
 import { COLORS } from '@/theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import type { NavigationProp } from '@react-navigation/native';
+import { useFocusEffect, type NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { ComponentProps } from 'react';
 import { useCallback, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { decodeJwtRole } from '@/api/adminApi';
-import { useFocusEffect } from '@react-navigation/native';
 
 type UserRoute = keyof Pick<
   RootStackParamList,
-  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies' | 'Notifications'
+  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies' | 'Notifications' | 'Messages'
 >;
 type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
 
@@ -24,6 +23,7 @@ const ICONS: Record<UserRoute, IconName> = {
   MyJobs: 'briefcase-outline',
   WorkerApplies: 'document-text-outline',
   Notifications: 'notifications-outline',
+  Messages: 'chatbubble-ellipses-outline',
 };
 
 const LABELS: Record<UserRoute, string> = {
@@ -32,6 +32,7 @@ const LABELS: Record<UserRoute, string> = {
   MyJobs: 'TIN CỦA TÔI',
   WorkerApplies: 'ĐÃ ỨNG TUYỂN',
   Notifications: 'THÔNG BÁO',
+  Messages: 'TIN NHẮN',
 };
 
 const TAB_H = 58;
@@ -67,8 +68,8 @@ export default function UserBottomBar({
 
   const routes: UserRoute[] =
     role === 'customer'
-      ? ['Home', 'MyJobs', 'BrowseJobs', 'Notifications']
-      : ['Home', 'BrowseJobs', 'WorkerApplies', 'Notifications'];
+      ? ['Home', 'MyJobs', 'Notifications', 'Messages']
+      : ['Home', 'BrowseJobs', 'WorkerApplies', 'Notifications', 'Messages'];
 
   return (
     <View

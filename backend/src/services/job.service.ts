@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import jobModel from "../models/job.model";
 import applicationModel from "../models/application.model";
 import userModel from "../models/user.model";
+import chatService from "./chat.service";
 import { haversineKm } from "../utils/distance";
 import {
   calculateApplicantScore,
@@ -413,6 +414,29 @@ export async function selectWorkers(
     }
     await job.save({ session });
     await session.commitTransaction();
+
+    // Ensure accepted customer-worker pairs can chat for this job.
+    const createConversationTasks = pick.map(async (p) => {
+      const { conversation, created } = await chatService.getOrCreateConversation(
+        customerId,
+        p.workerId,
+        jobId,
+      );
+      if (created) {
+        await chatService.sendIntroMessage(
+          String(conversation._id),
+          customerId,
+          String(job.title ?? ""),
+        );
+      }
+    });
+    const createConversationResults = await Promise.allSettled(createConversationTasks);
+    for (const result of createConversationResults) {
+      if (result.status === "rejected") {
+        console.error("[selectWorkers] failed to create conversation:", result.reason);
+      }
+    }
+
     return job.toObject();
   } catch (e) {
     await session.abortTransaction();

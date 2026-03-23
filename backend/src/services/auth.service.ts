@@ -4,8 +4,8 @@ import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
 import HTTP_STATUS from "../constants/httpStatus";
-import { sendVerifyEmail, sendForgotPasswordEmail } from "./email.service";
-import { signAccessToken, signRefreshToken, signEmailVerifyToken } from "../utils/jwt";
+import { sendForgotPasswordEmail } from "./email.service";
+import { signAccessToken, signRefreshToken } from "../utils/jwt";
 import { AppError } from "../utils/AppError";
 
 const generateOTP = (): string => {
@@ -19,6 +19,9 @@ export const loginService = async (email: string, password: string) => {
     }
     if (user.isDeleted) {
         throw new AppError("User account has been deleted", HTTP_STATUS.FORBIDDEN);
+    }
+    if (!user.password) {
+        throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
@@ -38,27 +41,31 @@ export const loginService = async (email: string, password: string) => {
         message: USER_MESSAGE.LOGIN_SUCCESSFUL,
         accessToken,
         refreshToken,
-        user: { id: user._id.toString(), role: user.role, name: user.name },
+        user: {
+            _id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar ?? null,
+        },
     };
 }
 
 export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {
-    const user = await userModel.findOne({ email });
-    if (user) {
+    const existing = await userModel.findOne({ email });
+    if (existing) {
         throw new AppError(USER_MESSAGE.USER_ALREADY_EXISTS, HTTP_STATUS.UNPROCESSABLE_ENTITY);
     }
     if (password !== confirm_password) {
         throw new AppError(USER_MESSAGE.PASSWORD_NOT_MATCH, HTTP_STATUS.BAD_REQUEST);
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user_id = new ObjectId()
+    const user_id = new ObjectId();
 
-    const emailVerifyToken = await signEmailVerifyToken(user_id.toString());
-    await userModel.create({ _id: user_id, name, email, password: hashedPassword, emailVerifyToken });
+    // isVerified: true so user can login immediately without email verification
+    await userModel.create({ _id: user_id, name, email, password: hashedPassword, isVerified: true });
 
-    await sendVerifyEmail(email, emailVerifyToken);
-
-    return { message: USER_MESSAGE.REGISTER_SUCCESSFUL, emailVerifyToken };
+    return { message: USER_MESSAGE.REGISTER_SUCCESSFUL };
 }
 
 export const verifyEmailService = async (emailVerifyToken: string) => {
@@ -70,9 +77,6 @@ export const verifyEmailService = async (emailVerifyToken: string) => {
     }
     if (user.isVerified) {
         throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
-    }
-    if (user.emailVerifyToken !== emailVerifyToken) {
-        throw new AppError(USER_MESSAGE.INVALID_EMAIL_VERIFY_TOKEN, HTTP_STATUS.BAD_REQUEST);
     }
 
     await userModel.updateOne({ _id: decoded._id }, { isVerified: true, emailVerifyToken: "" });
@@ -88,13 +92,7 @@ export const resendVerifyEmailService = async (email: string) => {
     if (user.isVerified) {
         throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
     }
-
-    const emailVerifyToken = await signEmailVerifyToken(user._id.toString());
-    await userModel.updateOne({ _id: user._id }, { emailVerifyToken });
-
-    await sendVerifyEmail(email, emailVerifyToken);
-
-    return { message: USER_MESSAGE.RESEND_VERIFY_EMAIL_SUCCESSFUL, emailVerifyToken };
+    return { message: USER_MESSAGE.RESEND_VERIFY_EMAIL_SUCCESSFUL };
 }
 
 export const forgotPasswordService = async (email: string) => {
@@ -104,7 +102,7 @@ export const forgotPasswordService = async (email: string) => {
     }
 
     const otp = generateOTP();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 phút
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     await userModel.updateOne(
         { _id: user._id },

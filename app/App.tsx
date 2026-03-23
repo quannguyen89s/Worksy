@@ -3,8 +3,10 @@ import 'react-native-gesture-handler';
 import './global.css';
 import { NavigationContainer } from '@react-navigation/native';
 import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '@/navigation/types';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppNavigator from './src/navigation/AppNavigator';
 import HomeScreen from '@/screens/HomeScreen';
 import LoginScreen from '@/components/authScreens/LoginScreen';
 import RegisterScreen from '@/components/authScreens/RegisterScreen';
@@ -12,16 +14,20 @@ import MyJobsScreen from '@/screens/MyJobsScreen';
 import BrowseJobsScreen from '@/screens/BrowseJobsScreen';
 import WorkerAppliesScreen from '@/screens/WorkerAppliesScreen';
 import NotificationsScreen from '@/screens/NotificationsScreen';
+import MessagesScreen from '@/screens/MessagesScreen';
+import ChatScreen from '@/screens/ChatScreen';
 import AdminDashboardScreen from '@/screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '@/screens/admin/AdminUsersScreen';
 import AdminJobsScreen from '@/screens/admin/AdminJobsScreen';
 import AdminSettingsScreen from '@/screens/admin/AdminSettingsScreen';
 import AdminAlertsScreen from './src/screens/admin/AdminAlertsScreen';
+
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
     <SafeAreaProvider>
+      <StatusBar barStyle="light-content" backgroundColor="#0f0f1a" translucent={false} />
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName="Login"
@@ -76,6 +82,16 @@ export default function App() {
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="Messages"
+            component={MessagesScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="Chat"
+            component={ChatScreen}
             options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
           />
         </Stack.Navigator>

@@ -1,16 +1,15 @@
 import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
-import authService from '@/services/authService';
+import AuthService from '@/services/authService';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { decodeJwtRole } from '@/api/adminApi';
 
 type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
@@ -37,6 +36,7 @@ export default function HomeScreen() {
       });
     }, []),
   );
+  const handleOpenMessages = () => navigation.navigate('Messages');
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -44,7 +44,7 @@ export default function HomeScreen() {
     try {
       const accessToken = await SecureStore.getItemAsync('accessToken');
       if (accessToken) {
-        await authService.logout(accessToken);
+        await AuthService.logout(accessToken);
       }
     } catch {
       // Always clear local auth data even if server logout fails.
@@ -73,14 +73,6 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('BrowseJobs')}
-            >
-              <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Tìm việc</Text>
-            </TouchableOpacity>
             {role === 'customer' ? (
               <>
                 <TouchableOpacity
@@ -107,9 +99,25 @@ export default function HomeScreen() {
                   <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
                   <Text style={styles.actionBtnText}>Thông báo</Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={handleOpenMessages}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin nhắn</Text>
+                </TouchableOpacity>
               </>
             ) : (
               <>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('BrowseJobs')}
+                >
+                  <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tìm việc</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionBtn}
                   activeOpacity={0.85}
@@ -121,14 +129,36 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   style={styles.actionBtn}
                   activeOpacity={0.85}
-                  onPress={() => navigation.navigate('Notifications')}
+                  onPress={handleOpenMessages}
                 >
-                  <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
-                  <Text style={styles.actionBtnText}>Thông báo</Text>
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin nhắn</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
+        </View>
+
+        {/* Khu vực tin nhắn — placeholder, design lại sau */}
+        <View style={styles.card}>
+          <Text style={[styles.cardTitle, styles.cardTitleCompact]}>Tin nhắn</Text>
+          <Text style={styles.cardHint}>
+            Danh sách cuộc trò chuyện sẽ hiển thị tại đây. Tạm thời mở màn hội thoại để xem tin nhắn.
+          </Text>
+          <TouchableOpacity
+            style={styles.messagesRow}
+            activeOpacity={0.85}
+            onPress={handleOpenMessages}
+          >
+            <View style={styles.messagesRowIcon}>
+              <Ionicons name="chatbubbles-outline" size={26} color={COLORS.primaryDark} />
+            </View>
+            <View style={styles.messagesRowText}>
+              <Text style={styles.messagesRowTitle}>Mở tin nhắn</Text>
+              <Text style={styles.messagesRowSub}>Xem tất cả cuộc trò chuyện</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
@@ -212,6 +242,35 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderLight,
   },
   cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 18 },
+  cardTitleCompact: { marginBottom: 10 },
+  cardHint: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  messagesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  messagesRowIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messagesRowText: { flex: 1 },
+  messagesRowTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  messagesRowSub: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   actionBtn: {
     flex: 1,
