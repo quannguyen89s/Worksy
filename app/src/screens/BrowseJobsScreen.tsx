@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
 import * as jobApi from '@/api/jobApi';
@@ -30,7 +30,6 @@ const CARD_WIDTH = Math.floor((SCREEN_WIDTH - PAD * 2 - CARD_GAP) / 2);
 
 const STATUS_OPTIONS: { id: string; label: string }[] = [
   { id: 'open', label: 'Đang tuyển' },
-  { id: 'partial', label: 'Một phần' },
   { id: 'full', label: 'Đã đủ' },
 ];
 
@@ -43,14 +42,13 @@ const SORT_OPTIONS: { id: jobApi.BrowseJobsParams['sort']; label: string }[] = [
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Đang tuyển',
-  partial: 'Một phần',
   full: 'Đã đủ',
   pending: 'Chờ duyệt',
-  done: 'Hoàn thành',
+  done: 'Hoàn thành', 
 };
 
 export default function BrowseJobsScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [accessToken, setAccessToken] = useState('');
   const [jobs, setJobs] = useState<jobApi.Job[]>([]);

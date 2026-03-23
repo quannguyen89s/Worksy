@@ -43,6 +43,10 @@ const jobSchema = new mongoose.Schema(
       enum: ["pending", "open", "full", "done"],
       default: "pending",
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

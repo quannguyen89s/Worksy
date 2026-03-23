@@ -9,7 +9,9 @@ export async function createApply(
 ) {
   const job = await jobModel.findById(body.jobId);
   if (!job) throw new AppError("Job not found", 404);
-  if (job.status === "full" || job.status === "done") {
+  if (job.isDeleted) throw new AppError("Job not found", 404);
+  // Chỉ nhận ứng tuyển khi job đã được admin duyệt và đang mở.
+  if (job.status !== "open") {
     throw new AppError("Cannot apply to this job", 400);
   }
   try {

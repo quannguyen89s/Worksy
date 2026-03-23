@@ -5,6 +5,7 @@ import authRouter from "./routes/auth.route";
 import applyRouter from "./routes/apply.route";
 import jobRouter from "./routes/job.route";
 import reviewRouter from "./routes/review.route";
+import adminRouter from "./routes/admin.route";
 import { errorHandler } from "./middlewares/error.middlewares";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/auth", authRouter);
 app.use("/jobs", jobRouter);
 app.use("/apply", applyRouter);
 app.use("/review", reviewRouter);
+app.use("/admin", adminRouter);
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: "Not found" });
 });

@@ -17,6 +17,9 @@ export const loginService = async (email: string, password: string) => {
     if (!user) {
         throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
+    if (user.isDeleted) {
+        throw new AppError("User account has been deleted", HTTP_STATUS.FORBIDDEN);
+    }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
         throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
