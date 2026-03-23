@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { loginService, registerService, verifyEmailService, resendVerifyEmailService, forgotPasswordService, verifyForgotPasswordOTPService, resetPasswordService, logoutService } from "../services/auth.service";
-import { googleLoginService } from "../services/google.service";
+import { getGoogleAuthURL, googleCallbackService } from "../services/google.service";
 import { LoginRequestBody, RegisterRequestBody, VerifyEmailRequestBody, ForgotPasswordRequestBody, VerifyForgotPasswordOTPRequestBody, ResetPasswordRequestBody } from "../models/request/user.request";
 import { ParamsDictionary } from "express-serve-static-core";
 import HTTP_STATUS from "../constants/httpStatus";
@@ -35,16 +35,37 @@ export const logoutController = async (req: Request, res: Response) => {
     }
 }
 
-export const googleLoginController = async (req: Request, res: Response) => {
+export const googleAuthController = async (req: Request, res: Response) => {
     try {
-        const { idToken } = req.body;
-        if (!idToken) {
-            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Google ID token is required" });
-        }
-        const result = await googleLoginService(idToken);
-        return res.status(HTTP_STATUS.OK).json(result);
+        const returnUrl = req.query.returnUrl as string || 'worksy://auth';
+        const callbackUrl = `${process.env.CLIENT_URL}/auth/google/callback`;
+        const url = getGoogleAuthURL(callbackUrl, returnUrl);
+        return res.redirect(url);
     } catch (error) {
         return handleError(error, res);
+    }
+}
+
+export const googleCallbackController = async (req: Request, res: Response) => {
+    try {
+        const code = req.query.code as string;
+        const returnUrl = req.query.state as string || 'worksy://auth';
+        if (!code) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Authorization code is required" });
+        }
+        const callbackUrl = `${process.env.CLIENT_URL}/auth/google/callback`;
+        const result = await googleCallbackService(code, callbackUrl);
+
+        const separator = returnUrl.includes('?') ? '&' : '?';
+        const deepLink = `${returnUrl}${separator}accessToken=${result.accessToken}&refreshToken=${result.refreshToken}`;
+        console.log('🔗 Redirecting to:', deepLink);
+
+        return res.redirect(deepLink);
+    } catch (error) {
+        console.error("Google callback error:", error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).send(
+            '<html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:Arial"><div style="text-align:center"><h2>Đăng nhập Google thất bại</h2><p>Vui lòng quay lại app và thử lại.</p></div></body></html>'
+        );
     }
 }
 
