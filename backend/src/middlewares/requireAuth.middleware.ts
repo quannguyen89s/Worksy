@@ -21,10 +21,12 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
     const decoded = jwt.verify(token, secret) as {
       _id?: string;
       sub?: string;
+      id?: string;
       role?: string;
       name?: string;
     };
-    const id = decoded._id ?? decoded.sub;
+    // hỗ trợ cả token cũ { id } lẫn token mới { _id, sub }
+    const id = decoded._id ?? decoded.sub ?? decoded.id;
     if (!id) {
       throw new AppError("Unauthorized", 401);
     }

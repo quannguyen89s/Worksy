@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const clearError = () => setErrorMsg('');
+  const clear = () => setErrorMsg('');
 
   const handleRegister = async () => {
     setErrorMsg('');
@@ -60,9 +60,9 @@ export default function RegisterScreen({ navigation }: Props) {
     try {
       await authService.register(name.trim(), email.trim(), password, confirmPassword);
       setSuccessMsg('Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.');
-    } catch (error: any) {
-      const msg = error.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
-      setErrorMsg(msg);
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { message?: string } } };
+      setErrorMsg(e.response?.data?.message ?? 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
@@ -175,6 +175,7 @@ export default function RegisterScreen({ navigation }: Props) {
               <Text style={styles.loginLink}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -1,7 +1,10 @@
 import applicationModel from "../models/application.model";
 import jobModel from "../models/job.model";
+import chatService from "./chat.service";
+import notificationService from "./notification.service";
 import { AppError } from "../utils/AppError";
 import { emitApplyNew } from "../sockets/emitters";
+import { emitNotification } from "../socket/socket";
 
 function sameSlot(a?: Date | string | null, b?: Date | string | null) {
   if (!a || !b) return false;
@@ -52,6 +55,45 @@ export async function createApply(
       status: "pending",
       ...(body.priceOffer != null ? { priceOffer: body.priceOffer } : {}),
     });
+    const { conversation, created } = await chatService.getOrCreateConversation(
+      workerId,
+      String(job.createdBy),
+      String(job._id),
+    );
+    if (created) {
+      await chatService.sendIntroMessage(
+        String(conversation._id),
+        workerId,
+        String(job.title ?? ""),
+      );
+    }
+
+    const customerNotification = await notificationService.create(
+      String(job.createdBy),
+      "job_application",
+      "Co nguoi ung tuyen moi",
+      `Cong viec "${String(job.title ?? "Cong viec")}" vua co ung tuyen moi.`,
+      {
+        jobId: String(job._id),
+        applicationId: String(doc._id),
+        workerId,
+      },
+    );
+    emitNotification(String(job.createdBy), customerNotification.toObject());
+
+    const workerNotification = await notificationService.create(
+      workerId,
+      "job_application",
+      "Da gui ung tuyen",
+      `Ban da gui ung tuyen vao cong viec "${String(job.title ?? "Cong viec")}".`,
+      {
+        jobId: String(job._id),
+        applicationId: String(doc._id),
+        customerId: String(job.createdBy),
+      },
+    );
+    emitNotification(workerId, workerNotification.toObject());
+
     void emitApplyNew(String(job.createdBy), String(job._id), String(doc._id));
     return doc.toObject();
   } catch (e: unknown) {

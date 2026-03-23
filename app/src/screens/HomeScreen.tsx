@@ -1,21 +1,42 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
-import authService from '@/services/authService';
+import AuthService from '@/services/authService';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { decodeJwtRole } from '@/api/adminApi';
+
+type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
 
 export default function HomeScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [role, setRole] = useState<UserRole>('guest');
+
+  useFocusEffect(
+    useCallback(() => {
+      void SecureStore.getItemAsync('accessToken').then((token) => {
+        if (!token) {
+          setRole('guest');
+          return;
+        }
+        const decoded = decodeJwtRole(token);
+        if (decoded === 'customer' || decoded === 'worker' || decoded === 'admin') {
+          setRole(decoded);
+        } else {
+          setRole('guest');
+        }
+      });
+    }, []),
+  );
+  const handleOpenMessages = () => navigation.navigate('Messages');
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -23,7 +44,7 @@ export default function HomeScreen() {
     try {
       const accessToken = await SecureStore.getItemAsync('accessToken');
       if (accessToken) {
-        await authService.logout(accessToken);
+        await AuthService.logout(accessToken);
       }
     } catch {
       // Always clear local auth data even if server logout fails.
@@ -41,7 +62,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
       <UserHeader
         title="Worksy"
-        subtitle="Chào mừng bạn trở lại"
+        subtitle={role === 'customer' ? 'Không gian khách hàng' : 'Không gian người lao động'}
         leftIcon="menu"
         onLeftPress={() => {}}
         rightLabel={loggingOut ? 'Đang thoát...' : 'Đăng xuất'}
@@ -52,60 +73,121 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('BrowseJobs')}
-            >
-              <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Tìm việc</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('MyJobs')}
-            >
-              <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Đăng tin</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('MyJobs')}
-            >
-              <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Tin của tôi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('WorkerApplies')}
-            >
-              <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
-            </TouchableOpacity>
+            {role === 'customer' ? (
+              <>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MyJobs')}
+                >
+                  <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Đăng tin</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MyJobs')}
+                >
+                  <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin của tôi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Notifications')}
+                >
+                  <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Thông báo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={handleOpenMessages}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin nhắn</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('BrowseJobs')}
+                >
+                  <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tìm việc</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('WorkerApplies')}
+                >
+                  <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={handleOpenMessages}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin nhắn</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
+        </View>
+
+        {/* Khu vực tin nhắn — placeholder, design lại sau */}
+        <View style={styles.card}>
+          <Text style={[styles.cardTitle, styles.cardTitleCompact]}>Tin nhắn</Text>
+          <Text style={styles.cardHint}>
+            Danh sách cuộc trò chuyện sẽ hiển thị tại đây. Tạm thời mở màn hội thoại để xem tin nhắn.
+          </Text>
+          <TouchableOpacity
+            style={styles.messagesRow}
+            activeOpacity={0.85}
+            onPress={handleOpenMessages}
+          >
+            <View style={styles.messagesRowIcon}>
+              <Ionicons name="chatbubbles-outline" size={26} color={COLORS.primaryDark} />
+            </View>
+            <View style={styles.messagesRowText}>
+              <Text style={styles.messagesRowTitle}>Mở tin nhắn</Text>
+              <Text style={styles.messagesRowSub}>Xem tất cả cuộc trò chuyện</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={COLORS.textMuted} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Tổng quan</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Việc đã xem</Text>
+              <Text style={styles.statLabel}>
+                {role === 'customer' ? 'Tin đã đăng' : 'Đơn đã ứng tuyển'}
+              </Text>
               <Text style={styles.statValue}>0</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Tin đã đăng</Text>
+              <Text style={styles.statLabel}>
+                {role === 'customer' ? 'Tin đang mở' : 'Việc đang làm'}
+              </Text>
               <Text style={styles.statValue}>0</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
+          <Text style={styles.cardTitle}>
+            {role === 'customer' ? 'Tin mới nhất' : 'Danh sách ứng tuyển đã làm'}
+          </Text>
           <View style={styles.emptyBox}>
             <Ionicons name="pricetag-outline" size={34} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
+            <Text style={styles.emptyText}>
+              {role === 'customer' ? 'Chưa có tin nào' : 'Chưa có lịch sử ứng tuyển'}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -160,6 +242,35 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderLight,
   },
   cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 18 },
+  cardTitleCompact: { marginBottom: 10 },
+  cardHint: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  messagesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  messagesRowIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messagesRowText: { flex: 1 },
+  messagesRowTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  messagesRowSub: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   actionBtn: {
     flex: 1,

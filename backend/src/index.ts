@@ -1,9 +1,12 @@
 import "dotenv/config";
 import "./types/express-augment";
 import http from "http";
+import dotenv from "dotenv";
+dotenv.config();
+
 import app from "./server";
 import connectDB from "./config/db";
-import { initSocket } from "./sockets/initSocket";
+import { initSocket } from "./socket/socket";
 import { completeOverdueJobs } from "./services/job.service";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -37,7 +40,4 @@ async function start() {
   });
 }
 
-start().catch((err) => {
-  console.error("Failed to start server:", err);
-  process.exit(1);
-});
+start();

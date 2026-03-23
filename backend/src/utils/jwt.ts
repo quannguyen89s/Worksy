@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 
 export const signAccessToken = (userId: string, role: string) => {
     return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" }, (err, token) => {
+        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "7d" }, (err, token) => {
             if (err) reject(err);
             resolve(token as string);
         });
