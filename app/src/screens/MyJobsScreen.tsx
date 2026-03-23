@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
 import * as jobApi from '@/api/jobApi';
 
 const { getErrorMessage } = jobApi;
@@ -35,6 +36,14 @@ export default function MyJobsScreen() {
     skillTags: '',
   });
 
+  useFocusEffect(
+    useCallback(() => {
+      SecureStore.getItemAsync('accessToken').then((token) => {
+        setAccessToken(token ?? '');
+      });
+    }, []),
+  );
+
   const fetchMyJobs = useCallback(async () => {
     if (!accessToken.trim()) {
       setMyJobs([]);
@@ -61,7 +70,7 @@ export default function MyJobsScreen() {
 
   const handleCreate = async () => {
     if (!accessToken.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập Access Token');
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập để đăng tin');
       return;
     }
     const price = parseFloat(form.price);
@@ -214,17 +223,7 @@ export default function MyJobsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Token section */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Xác thực</Text>
-          <Text style={styles.cardHint}>Dán access token sau khi đăng nhập</Text>
-          <TextInput
-            placeholder="Bearer token..."
-            value={accessToken}
-            onChangeText={setAccessToken}
-            placeholderTextColor={COLORS.textMuted}
-            style={styles.input}
-          />
           {loading && <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 12 }} />}
           <View style={styles.btnRow}>
             <TouchableOpacity
@@ -311,7 +310,7 @@ export default function MyJobsScreen() {
           {myJobs.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>Chưa có tin nào</Text>
-              <Text style={styles.emptyHint}>Nhập token và bấm "Đăng tin mới" để tạo</Text>
+              <Text style={styles.emptyHint}>Bấm "Đăng tin mới" để tạo tin tuyển dụng</Text>
             </View>
           ) : (
             myJobs.map((job) => (
@@ -365,7 +364,7 @@ export default function MyJobsScreen() {
         onRequestClose={() => setSelectedJob(null)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setSelectedJob(null)}>
-          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => {}}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => { }}>
             {selectedJob && (
               <>
                 <View style={styles.modalHeader}>

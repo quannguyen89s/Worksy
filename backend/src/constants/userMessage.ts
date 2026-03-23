@@ -16,9 +16,11 @@ export const USER_MESSAGE = {
     NAME_ALREADY_EXISTS: "Name already exists",
     EMAIL_VERIFY_TOKEN_REQUIRED: "Email verify token is required",
     EMAIL_VERIFY_TOKEN_MUST_BE_STRING: "Email verify token must be a string",
-
+    TOKEN_REQUIRED: "Token is required",
+    INVALID_TOKEN: "Invalid token",
     // Auth
     LOGIN_SUCCESSFUL: "Login successful",
+    GOOGLE_LOGIN_SUCCESSFUL: "Google login successful",
     REGISTER_SUCCESSFUL: "Register successful",
     USER_NOT_FOUND: "User not found",
     INVALID_PASSWORD: "Invalid password",
@@ -31,7 +33,19 @@ export const USER_MESSAGE = {
     INVALID_EMAIL_VERIFY_TOKEN: "Invalid email verify token",
     RESEND_VERIFY_EMAIL_SUCCESSFUL: "Resend verification email successfully",
 
+    // Forgot Password
+    FORGOT_PASSWORD_EMAIL_SENT: "OTP has been sent to your email",
+    OTP_REQUIRED: "OTP is required",
+    OTP_MUST_BE_STRING: "OTP must be a string",
+    OTP_INVALID_FORMAT: "OTP must be 6 digits",
+    INVALID_OTP: "Invalid OTP",
+    OTP_EXPIRED: "OTP has expired. Please request a new one",
+    VERIFY_OTP_SUCCESSFUL: "OTP verified successfully",
+    RESET_PASSWORD_SUCCESSFUL: "Reset password successfully",
+    LOGOUT_SUCCESSFUL: "Logout successfully",
+
     // General
+    UNAUTHORIZED: "You do not have permission to access this resource",
     INTERNAL_SERVER_ERROR: "Internal server error",
 } as const
 

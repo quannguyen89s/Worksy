@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "./types/express-augment";
 import http from "http";
 import app from "./server";
