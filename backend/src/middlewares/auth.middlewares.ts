@@ -131,7 +131,6 @@ export const registerValidator = validate(checkSchema({
     },
 }, ["body"]));
 
-
 export const emailVerifyValidator = validate(checkSchema({
     emailVerifyToken: {
         notEmpty: {
@@ -143,7 +142,6 @@ export const emailVerifyValidator = validate(checkSchema({
         trim: true,
     },
 }, ["body"]));
-
 
 export const resendVerifyEmailValidator = validate(checkSchema({
     email: {
@@ -157,7 +155,6 @@ export const resendVerifyEmailValidator = validate(checkSchema({
     },
 }, ["body"]));
 
-
 export const forgotPasswordValidator = validate(checkSchema({
     email: {
         notEmpty: {
@@ -170,16 +167,86 @@ export const forgotPasswordValidator = validate(checkSchema({
     },
 }, ["body"]));
 
-
-export const verifyForgotPasswordTokenValidator = validate(checkSchema({
-    forgotPasswordToken: {
+export const verifyOTPValidator = validate(checkSchema({
+    email: {
         notEmpty: {
-            errorMessage: USER_MESSAGE.FORGOT_PASSWORD_TOKEN_REQUIRED,
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+    otp: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.OTP_REQUIRED,
         },
         isString: {
-            errorMessage: USER_MESSAGE.FORGOT_PASSWORD_TOKEN_MUST_BE_STRING,
+            errorMessage: USER_MESSAGE.OTP_MUST_BE_STRING,
+        },
+        isLength: {
+            options: { min: 6, max: 6 },
+            errorMessage: USER_MESSAGE.OTP_INVALID_FORMAT,
         },
         trim: true,
     },
 }, ["body"]));
 
+export const resetPasswordValidator = validate(checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+    otp: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.OTP_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.OTP_MUST_BE_STRING,
+        },
+        isLength: {
+            options: { min: 6, max: 6 },
+            errorMessage: USER_MESSAGE.OTP_INVALID_FORMAT,
+        },
+        trim: true,
+    },
+    password: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
+        },
+        isLength: {
+            options: { min: 6 },
+            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
+        },
+        matches: {
+            options: /[A-Z]/,
+            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
+        },
+        custom: {
+            options: (value: string) => {
+                if (!/[0-9]/.test(value)) {
+                    throw new Error(USER_MESSAGE.PASSWORD_NUMBER);
+                }
+                return true;
+            },
+        },
+    },
+    confirm_password: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.CONFIRM_PASSWORD_REQUIRED,
+        },
+        custom: {
+            options: (value, { req }) => {
+                if (value !== req.body.password) {
+                    throw new Error(USER_MESSAGE.CONFIRM_PASSWORD_NOT_MATCH);
+                }
+                return true;
+            },
+        },
+    },
+}, ["body"]));

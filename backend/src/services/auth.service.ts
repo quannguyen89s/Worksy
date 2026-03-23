@@ -32,17 +32,11 @@ const signEmailVerifyToken = (userId: string) => {
     });
 }
 
-const signForgotPasswordToken = (userId: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN!, { expiresIn: "1h" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
+const generateOTP = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export const loginService = async (email: string, password: string) => {
-
     const user = await userModel.findOne({ email });
     if (!user) {
         return { message: USER_MESSAGE.USER_NOT_FOUND };
@@ -122,27 +116,59 @@ export const resendVerifyEmailService = async (email: string) => {
 export const forgotPasswordService = async (email: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
     }
 
-    const forgotPasswordToken = await signForgotPasswordToken(user._id.toString());
-    await userModel.updateOne({ _id: user._id }, { forgotPasswordToken });
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 phút
 
-    await sendForgotPasswordEmail(email, forgotPasswordToken);
+    await userModel.updateOne(
+        { _id: user._id },
+        { forgotPasswordOTP: otp, forgotPasswordOTPExpiry: otpExpiry }
+    );
 
-    return { message: USER_MESSAGE.FORGOT_PASSWORD_EMAIL_SENT, forgotPasswordToken };
+    await sendForgotPasswordEmail(email, otp);
+
+    return { message: USER_MESSAGE.FORGOT_PASSWORD_EMAIL_SENT };
 }
 
-export const verifyForgotPasswordTokenService = async (forgotPasswordToken: string) => {
-    const decoded = jwt.verify(forgotPasswordToken, process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN!) as { _id: string };
-
-    const user = await userModel.findById(decoded._id);
+export const verifyForgotPasswordOTPService = async (email: string, otp: string) => {
+    const user = await userModel.findOne({ email });
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
     }
-    if (user.forgotPasswordToken !== forgotPasswordToken) {
-        return { message: USER_MESSAGE.INVALID_FORGOT_PASSWORD_TOKEN };
+    if (user.forgotPasswordOTP !== otp) {
+        throw new Error(USER_MESSAGE.INVALID_OTP);
+    }
+    if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
+        throw new Error(USER_MESSAGE.OTP_EXPIRED);
     }
 
-    return { message: USER_MESSAGE.VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESSFUL };
+    return { message: USER_MESSAGE.VERIFY_OTP_SUCCESSFUL };
+}
+
+export const resetPasswordService = async (email: string, otp: string, password: string) => {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
+    }
+    if (user.forgotPasswordOTP !== otp) {
+        throw new Error(USER_MESSAGE.INVALID_OTP);
+    }
+    if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
+        throw new Error(USER_MESSAGE.OTP_EXPIRED);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await userModel.updateOne(
+        { _id: user._id },
+        { password: hashedPassword, forgotPasswordOTP: "", forgotPasswordOTPExpiry: null }
+    );
+
+    return { message: USER_MESSAGE.RESET_PASSWORD_SUCCESSFUL };
+}
+
+export const logoutService = async (userId: string) => {
+    await userModel.updateOne({ _id: userId }, { refreshToken: "" });
+    return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
 }

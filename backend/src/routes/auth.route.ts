@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { loginController, registerController, verifyEmailController, verifyEmailByLinkController, resendVerifyEmailController, forgotPasswordController, verifyForgotPasswordTokenController, verifyForgotPasswordByLinkController } from "../controllers/auth.controller";
-import { loginValidator, registerValidator, emailVerifyValidator, resendVerifyEmailValidator, forgotPasswordValidator, verifyForgotPasswordTokenValidator } from "../middlewares/auth.middlewares";
+import { loginController, registerController, verifyEmailController, verifyEmailByLinkController, resendVerifyEmailController, forgotPasswordController, verifyForgotPasswordOTPController, resetPasswordController, logoutController } from "../controllers/auth.controller";
+import { loginValidator, registerValidator, emailVerifyValidator, resendVerifyEmailValidator, forgotPasswordValidator, verifyOTPValidator, resetPasswordValidator, authenticateToken } from "../middlewares/auth.middlewares";
 
 const authRouter = Router();
 
@@ -10,7 +10,8 @@ authRouter.post("/verify-email", emailVerifyValidator, verifyEmailController);
 authRouter.get("/verify-email", verifyEmailByLinkController);
 authRouter.post("/resend-verify-email", resendVerifyEmailValidator, resendVerifyEmailController);
 authRouter.post("/forgot-password", forgotPasswordValidator, forgotPasswordController);
-authRouter.get("/verify-forgot-password-token", verifyForgotPasswordByLinkController);
-authRouter.post("/verify-forgot-password-token", verifyForgotPasswordTokenValidator, verifyForgotPasswordTokenController);
+authRouter.post("/verify-otp", verifyOTPValidator, verifyForgotPasswordOTPController);
+authRouter.post("/reset-password", resetPasswordValidator, resetPasswordController);
+authRouter.post("/logout", authenticateToken, logoutController);
 
 export default authRouter;

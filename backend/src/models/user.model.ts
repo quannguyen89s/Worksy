@@ -34,9 +34,13 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: UserVerifyStatus.Unverified,
     },
-    forgotPasswordToken: {
+    forgotPasswordOTP: {
       type: String,
       default: "",
+    },
+    forgotPasswordOTPExpiry: {
+      type: Date,
+      default: null,
     },
     emailVerifyToken: {
       type: String,

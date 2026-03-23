@@ -33,11 +33,15 @@ export const USER_MESSAGE = {
     RESEND_VERIFY_EMAIL_SUCCESSFUL: "Resend verification email successfully",
 
     // Forgot Password
-    FORGOT_PASSWORD_EMAIL_SENT: "Forgot password email sent successfully",
-    FORGOT_PASSWORD_TOKEN_REQUIRED: "Forgot password token is required",
-    FORGOT_PASSWORD_TOKEN_MUST_BE_STRING: "Forgot password token must be a string",
-    INVALID_FORGOT_PASSWORD_TOKEN: "Invalid forgot password token",
-    VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESSFUL: "Verify forgot password token successfully",
+    FORGOT_PASSWORD_EMAIL_SENT: "OTP has been sent to your email",
+    OTP_REQUIRED: "OTP is required",
+    OTP_MUST_BE_STRING: "OTP must be a string",
+    OTP_INVALID_FORMAT: "OTP must be 6 digits",
+    INVALID_OTP: "Invalid OTP",
+    OTP_EXPIRED: "OTP has expired. Please request a new one",
+    VERIFY_OTP_SUCCESSFUL: "OTP verified successfully",
+    RESET_PASSWORD_SUCCESSFUL: "Reset password successfully",
+    LOGOUT_SUCCESSFUL: "Logout successfully",
 
     // General
     UNAUTHORIZED: "You do not have permission to access this resource",

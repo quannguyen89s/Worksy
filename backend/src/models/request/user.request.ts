@@ -18,6 +18,14 @@ export interface ForgotPasswordRequestBody {
     email: string
 }
 
-export interface VerifyForgotPasswordRequestBody {
-    forgotPasswordToken: string
+export interface VerifyForgotPasswordOTPRequestBody {
+    email: string
+    otp: string
+}
+
+export interface ResetPasswordRequestBody {
+    email: string
+    otp: string
+    password: string
+    confirm_password: string
 }
