@@ -1,15 +1,17 @@
-import { Response } from "express";
-import { AuthRequest } from "../middleware/auth";
+import { Request, Response } from "express";
+import { AuthRequest } from "../middlewares/access.middleware";
 import notificationService from "../services/notification.service";
 
+const authUser = (req: Request) => (req as unknown as AuthRequest).user;
+
 class NotificationController {
-  async getNotifications(req: AuthRequest, res: Response): Promise<void> {
+  async getNotifications(req: Request, res: Response): Promise<void> {
     try {
       const page = parseInt((req.query["page"] as string | undefined) ?? "1", 10);
       const limit = parseInt((req.query["limit"] as string | undefined) ?? "20", 10);
 
       const result = await notificationService.getNotifications(
-        req.user!.id,
+        authUser(req).id,
         page,
         limit
       );
@@ -19,19 +21,20 @@ class NotificationController {
       res.status(500).json({ success: false, message: "Lỗi server", error });
     }
   }
-  async getUnreadCount(req: AuthRequest, res: Response): Promise<void> {
+
+  async getUnreadCount(req: Request, res: Response): Promise<void> {
     try {
-      const count = await notificationService.getUnreadCount(req.user!.id);
+      const count = await notificationService.getUnreadCount(authUser(req).id);
       res.json({ success: true, unreadCount: count });
     } catch (error) {
       res.status(500).json({ success: false, message: "Lỗi server", error });
     }
   }
 
-  async markRead(req: AuthRequest, res: Response): Promise<void> {
+  async markRead(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params as { id: string };
-      const notification = await notificationService.markRead(id, req.user!.id);
+      const notification = await notificationService.markRead(id, authUser(req).id);
 
       if (!notification) {
         res.status(404).json({ success: false, message: "Không tìm thấy notification" });
@@ -43,19 +46,20 @@ class NotificationController {
       res.status(500).json({ success: false, message: "Lỗi server", error });
     }
   }
-  async markAllRead(req: AuthRequest, res: Response): Promise<void> {
+
+  async markAllRead(req: Request, res: Response): Promise<void> {
     try {
-      await notificationService.markAllRead(req.user!.id);
+      await notificationService.markAllRead(authUser(req).id);
       res.json({ success: true, message: "Đã đánh dấu tất cả là đã đọc" });
     } catch (error) {
       res.status(500).json({ success: false, message: "Lỗi server", error });
     }
   }
 
-  async deleteNotification(req: AuthRequest, res: Response): Promise<void> {
+  async deleteNotification(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params as { id: string };
-      const deleted = await notificationService.deleteOne(id, req.user!.id);
+      const deleted = await notificationService.deleteOne(id, authUser(req).id);
 
       if (!deleted) {
         res.status(404).json({ success: false, message: "Không tìm thấy notification" });

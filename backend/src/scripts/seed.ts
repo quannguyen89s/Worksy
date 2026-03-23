@@ -36,6 +36,7 @@ async function seed(): Promise<void> {
     password: passwordHash,
     role: "customer",
     avatar: "",
+    isVerified: true,
   });
 
   const worker = await User.create({
@@ -44,6 +45,7 @@ async function seed(): Promise<void> {
     password: passwordHash,
     role: "worker",
     avatar: "",
+    isVerified: true,
   });
 
   const worker2 = await User.create({
@@ -52,6 +54,7 @@ async function seed(): Promise<void> {
     password: passwordHash,
     role: "worker",
     avatar: "",
+    isVerified: true,
   });
 
   const job1 = await Job.create({

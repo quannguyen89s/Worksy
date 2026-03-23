@@ -1,8 +1,9 @@
 import express, { json, Request, Response, urlencoded } from "express";
 import connectDB from "./config/db";
-import authRoutes from "./routes/auth.routes";
+import authRoutes from "./routes/auth.route";
 import chatRoutes from "./routes/chat.routes";
 import notificationRoutes from "./routes/notification.routes";
+import userRoutes from "./routes/user.routes";
 
 import "./models/user.model";
 import "./models/job.model";
@@ -21,5 +22,6 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/auth", authRoutes);
 app.use("/chat", chatRoutes);
 app.use("/notifications", notificationRoutes);
+app.use("/users", userRoutes);
 
 export default app;
