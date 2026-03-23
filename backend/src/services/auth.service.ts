@@ -34,7 +34,7 @@ const signEmailVerifyToken = (userId: string) => {
 
 export const loginService = async (email: string, password: string) => {
 
-    const user = await userModel.findOne({ email });
+    const user = await userModel.findOne({ email }).select("+password");
     if (!user) {
         return { message: USER_MESSAGE.USER_NOT_FOUND };
     }

@@ -7,30 +7,47 @@ const jobSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     description: {
       type: String,
       required: true,
     },
-
     price: {
       type: Number,
       required: true,
       min: 0,
     },
-
+    location: {
+      lat: { type: Number, required: true },
+      lng: { type: Number, required: true },
+    },
+    skillTags: {
+      type: [String],
+      default: [],
+    },
+    requiredWorkers: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    assignedWorkers: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    assignedWorkerIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
     status: {
       type: String,
-      enum: ["open", "assigned", "completed", "cancelled"],
+      enum: ["open", "partial", "full", "done"],
       default: "open",
     },
-
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

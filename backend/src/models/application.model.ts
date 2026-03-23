@@ -18,7 +18,10 @@ const applicationSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-
+    priceOffer: {
+      type: Number,
+      min: 0,
+    },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected"],
