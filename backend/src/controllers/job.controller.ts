@@ -75,6 +75,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description,
     price,
     location,
+    scheduledAt,
     requiredWorkers,
     skillTags,
   } = req.body as {
@@ -82,6 +83,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
   };
@@ -90,6 +92,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
   } = {
@@ -97,6 +100,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description,
     price,
     location,
+    scheduledAt,
     requiredWorkers,
   };
   if (skillTags !== undefined) payload.skillTags = skillTags;
@@ -111,6 +115,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description,
     price,
     location,
+    scheduledAt,
     requiredWorkers,
     skillTags,
   } = req.body as {
@@ -118,6 +123,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
   };
@@ -126,6 +132,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
   } = {};
@@ -133,6 +140,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
   if (description !== undefined) payload.description = description;
   if (price !== undefined) payload.price = price;
   if (location !== undefined) payload.location = location;
+  if (scheduledAt !== undefined) payload.scheduledAt = scheduledAt;
   if (requiredWorkers !== undefined) payload.requiredWorkers = requiredWorkers;
   if (skillTags !== undefined) payload.skillTags = skillTags;
   const data = await jobService.updateJob(paramId(req), customerId, payload);

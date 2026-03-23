@@ -3,6 +3,20 @@ import jobModel from "../models/job.model";
 import { AppError } from "../utils/AppError";
 import { emitApplyNew } from "../sockets/emitters";
 
+function sameSlot(a?: Date | string | null, b?: Date | string | null) {
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate() &&
+    da.getHours() === db.getHours() &&
+    da.getMinutes() === db.getMinutes()
+  );
+}
+
 export async function createApply(
   workerId: string,
   body: { jobId: string; priceOffer?: number },
@@ -13,6 +27,21 @@ export async function createApply(
   // Chỉ nhận ứng tuyển khi job đã được admin duyệt và đang mở.
   if (job.status !== "open") {
     throw new AppError("Cannot apply to this job", 400);
+  }
+  const activeApplies = await applicationModel
+    .find({
+      workerId,
+      status: { $in: ["pending", "accepted"] },
+    })
+    .populate("jobId", "scheduledAt")
+    .lean();
+  for (const row of activeApplies) {
+    const j = row.jobId as unknown as { _id?: unknown; scheduledAt?: Date | string };
+    if (!j?._id) continue;
+    if (String(j._id) === String(job._id)) continue;
+    if (sameSlot(j.scheduledAt, job.scheduledAt)) {
+      throw new AppError("You already have another job application at this time", 409);
+    }
   }
   try {
     const doc = await applicationModel.create({

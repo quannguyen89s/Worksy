@@ -1,29 +1,45 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Modal, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import * as SecureStore from 'expo-secure-store';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import * as jobApi from '@/api/jobApi';
 import { COLORS } from '@/theme/colors';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import type { RootStackParamList } from '@/navigation/types';
 
 const { getErrorMessage } = jobApi;
 
 export default function MyJobsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [accessToken, setAccessToken] = useState('');
   const [myJobs, setMyJobs] = useState<jobApi.Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [createMode, setCreateMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<jobApi.Job | null>(null);
+  const [applicantsJob, setApplicantsJob] = useState<jobApi.Job | null>(null);
+  const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+  const [applicants, setApplicants] = useState<jobApi.RankedApplicant[]>([]);
+  const [loadingApplicants, setLoadingApplicants] = useState(false);
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
   const editIdRef = useRef<string | null>(null);
   const [form, setForm] = useState({
     title: '',
     description: '',
     price: '',
     requiredWorkers: '1',
+    workDate: '',
+    workTime: '',
     skillTags: '',
   });
+  const [showDateTimePicker, setShowDateTimePicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+  const [pickerValue, setPickerValue] = useState(new Date());
 
   useFocusEffect(
     useCallback(() => {
@@ -57,6 +73,73 @@ export default function MyJobsScreen() {
     editIdRef.current = editId;
   }, [editId]);
 
+  const toIsoSchedule = (dateText: string, timeText: string) => {
+    const date = dateText.trim();
+    const time = timeText.trim();
+    if (!date || !time) return null;
+    const iso = `${date}T${time}:00`;
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString();
+  };
+
+  const splitSchedule = (iso?: string) => {
+    if (!iso) return { workDate: '', workTime: '' };
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return { workDate: '', workTime: '' };
+    const y = d.getFullYear();
+    const m = `${d.getMonth() + 1}`.padStart(2, '0');
+    const dd = `${d.getDate()}`.padStart(2, '0');
+    const hh = `${d.getHours()}`.padStart(2, '0');
+    const mm = `${d.getMinutes()}`.padStart(2, '0');
+    return { workDate: `${y}-${m}-${dd}`, workTime: `${hh}:${mm}` };
+  };
+
+  const formatDateInput = (date: Date) => {
+    const y = date.getFullYear();
+    const m = `${date.getMonth() + 1}`.padStart(2, '0');
+    const d = `${date.getDate()}`.padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const formatTimeInput = (date: Date) => {
+    const hh = `${date.getHours()}`.padStart(2, '0');
+    const mm = `${date.getMinutes()}`.padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const currentFormDate = () => {
+    const iso = toIsoSchedule(form.workDate, form.workTime);
+    if (iso) return new Date(iso);
+    return new Date();
+  };
+
+  const openPicker = (mode: 'date' | 'time') => {
+    setPickerMode(mode);
+    setPickerValue(currentFormDate());
+    setShowDateTimePicker(true);
+  };
+
+  const handlePickerChange = (event: DateTimePickerEvent, selected?: Date) => {
+    if (event.type === 'dismissed' || !selected) {
+      return;
+    }
+    setPickerValue(selected);
+  };
+
+  const confirmPickerValue = () => {
+    if (pickerMode === 'date') {
+      setForm((f) => ({ ...f, workDate: formatDateInput(pickerValue) }));
+    } else {
+      setForm((f) => ({ ...f, workTime: formatTimeInput(pickerValue) }));
+    }
+    setShowDateTimePicker(false);
+  };
+
+  const cancelPickerValue = () => {
+    setShowDateTimePicker(false);
+  };
+
   const handleCreate = async () => {
     if (!accessToken.trim()) {
       Alert.alert('Lỗi', 'Vui lòng đăng nhập để đăng tin');
@@ -80,6 +163,11 @@ export default function MyJobsScreen() {
       Alert.alert('Lỗi', 'Số worker tối thiểu là 1');
       return;
     }
+    const scheduledAt = toIsoSchedule(form.workDate, form.workTime);
+    if (!scheduledAt) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đúng ngày và giờ làm (YYYY-MM-DD, HH:mm)');
+      return;
+    }
     setLoading(true);
     try {
       await jobApi.createJob(accessToken.trim(), {
@@ -87,10 +175,11 @@ export default function MyJobsScreen() {
         description: form.description.trim(),
         price,
         location: { lat: 21.0285, lng: 105.8542 },
+        scheduledAt,
         requiredWorkers,
         skillTags: form.skillTags ? form.skillTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       });
-      setForm({ title: '', description: '', price: '', requiredWorkers: '1', skillTags: '' });
+      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
       setCreateMode(false);
       setEditId(null);
       editIdRef.current = null;
@@ -115,18 +204,24 @@ export default function MyJobsScreen() {
       Alert.alert('Lỗi', 'Giá và số worker không hợp lệ');
       return;
     }
+    const scheduledAt = toIsoSchedule(form.workDate, form.workTime);
+    if (!scheduledAt) {
+      Alert.alert('Lỗi', 'Vui lòng nhập đúng ngày và giờ làm (YYYY-MM-DD, HH:mm)');
+      return;
+    }
     setLoading(true);
     try {
       await jobApi.updateJob(accessToken.trim(), jobId, {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         price,
+        scheduledAt,
         requiredWorkers,
         skillTags: form.skillTags ? form.skillTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       });
       setEditId(null);
       editIdRef.current = null;
-      setForm({ title: '', description: '', price: '', requiredWorkers: '1', skillTags: '' });
+      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
       fetchMyJobs();
       Alert.alert('Thành công', 'Đã cập nhật tin');
     } catch (err: unknown) {
@@ -170,6 +265,7 @@ export default function MyJobsScreen() {
       description: job.description,
       price: String(job.price),
       requiredWorkers: String(job.requiredWorkers),
+      ...splitSchedule(job.scheduledAt),
       skillTags: (job.skillTags ?? []).join(', '),
     });
   };
@@ -178,7 +274,7 @@ export default function MyJobsScreen() {
     setEditId(null);
     setCreateMode(false);
     editIdRef.current = null;
-    setForm({ title: '', description: '', price: '', requiredWorkers: '1', skillTags: '' });
+    setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
   };
 
   const getStatusLabel = (status: string) => {
@@ -197,20 +293,135 @@ export default function MyJobsScreen() {
     return map[status] ?? COLORS.textMuted;
   };
 
-  const canEditDelete = (status: string) => status !== 'pending';
+  const canEditDelete = (status: string) => status === 'open';
+  const canComplete = (job: jobApi.Job) =>
+    job.status !== 'done' && job.status !== 'pending' && (job.assignedWorkers ?? 0) > 0;
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '--';
+    return date.toLocaleString('vi-VN');
+  };
+
+  const getCompletionSourceLabel = (source?: 'manual' | 'auto' | null) => {
+    if (source === 'manual') return 'Khách hàng hoàn thành';
+    if (source === 'auto') return 'Tự động hoàn thành';
+    return 'Chưa xác định';
+  };
+
+  const handleComplete = (job: jobApi.Job) => {
+    Alert.alert(
+      'Xác nhận hoàn thành',
+      `Đánh dấu job "${job.title}" là hoàn thành?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Set done',
+          style: 'default',
+          onPress: async () => {
+            if (!accessToken.trim()) return;
+            setLoading(true);
+            try {
+              await jobApi.completeJob(accessToken.trim(), job._id);
+              await fetchMyJobs();
+              Alert.alert('Thành công', 'Đã đánh dấu hoàn thành.');
+            } catch (err: unknown) {
+              Alert.alert('Lỗi', getErrorMessage(err));
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const canReviewApplicants = (job: jobApi.Job) => job.status === 'open' || job.status === 'partial';
+
+  const loadApplicants = useCallback(async (jobId: string) => {
+    if (!accessToken.trim()) return;
+    setLoadingApplicants(true);
+    try {
+      const rows = await jobApi.listApplicants(accessToken.trim(), jobId);
+      if (__DEV__) {
+        console.log('[MyJobs] applicants payload:', rows.map((r) => ({
+          applyId: r.apply?._id,
+          workerId: r.apply?.workerId,
+          score: r.score,
+          rating: r.worker?.rating,
+        })));
+      }
+      setApplicants(rows);
+      setSelectedWorkerIds([]);
+    } catch (err: unknown) {
+      setApplicants([]);
+      Alert.alert('Lỗi', getErrorMessage(err));
+    } finally {
+      setLoadingApplicants(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!showApplicantsModal || !applicantsJob) {
+      setApplicants([]);
+      setSelectedWorkerIds([]);
+      return;
+    }
+    void loadApplicants(applicantsJob._id);
+  }, [showApplicantsModal, applicantsJob, loadApplicants]);
+
+  const toggleWorker = (workerId: string) => {
+    setSelectedWorkerIds((prev) =>
+      prev.includes(workerId) ? prev.filter((id) => id !== workerId) : [...prev, workerId],
+    );
+  };
+
+  const normalizeScore = (value: unknown) => {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, n);
+  };
+
+  const handleSelectWorkers = async () => {
+    if (!applicantsJob || !accessToken.trim()) return;
+    if (selectedWorkerIds.length === 0) {
+      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất 1 ứng viên.');
+      return;
+    }
+    Alert.alert(
+      'Xác nhận chọn ứng viên',
+      `Bạn muốn chốt ${selectedWorkerIds.length} ứng viên cho job này?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Xác nhận',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await jobApi.selectWorkers(accessToken.trim(), applicantsJob._id, selectedWorkerIds);
+              Alert.alert('Thành công', 'Đã chọn ứng viên.');
+              await fetchMyJobs();
+              await loadApplicants(applicantsJob._id);
+            } catch (err: unknown) {
+              Alert.alert('Lỗi', getErrorMessage(err));
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Tin của tôi</Text>
-          <Text style={styles.headerSubtitle}>Quản lý tin tuyển dụng</Text>
-        </View>
-      </View>
+      <UserHeader
+        title="Tin của tôi"
+        subtitle="Quản lý tin tuyển dụng"
+        leftIcon="menu"
+        onLeftPress={() => navigation.navigate('Home' as never)}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -224,7 +435,7 @@ export default function MyJobsScreen() {
             <TouchableOpacity
               style={[styles.btn, styles.btnPrimary]}
               activeOpacity={0.8}
-              onPress={() => { setCreateMode(true); setEditId(null); editIdRef.current = null; setForm({ title: '', description: '', price: '', requiredWorkers: '1', skillTags: '' }); }}
+              onPress={() => { setCreateMode(true); setEditId(null); editIdRef.current = null; setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' }); }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.btnPrimaryText}>+ Đăng tin mới</Text>
@@ -273,6 +484,26 @@ export default function MyJobsScreen() {
                 style={[styles.input, { width: 90 }]}
               />
             </View>
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={[styles.input, styles.pickerInput, { flex: 1, marginRight: 8 }]}
+                onPress={() => openPicker('date')}
+                activeOpacity={0.8}
+              >
+                <Text style={form.workDate ? styles.pickerValue : styles.pickerPlaceholder}>
+                  {form.workDate || 'Chọn ngày làm'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.input, styles.pickerInput, { width: 110 }]}
+                onPress={() => openPicker('time')}
+                activeOpacity={0.8}
+              >
+                <Text style={form.workTime ? styles.pickerValue : styles.pickerPlaceholder}>
+                  {form.workTime || 'Chọn giờ'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               placeholder="Kỹ năng (cách nhau bằng dấu phẩy)"
               value={form.skillTags}
@@ -305,7 +536,7 @@ export default function MyJobsScreen() {
           {myJobs.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>Chưa có tin nào</Text>
-              <Text style={styles.emptyHint}>Bấm "Đăng tin mới" để tạo tin tuyển dụng</Text>
+              <Text style={styles.emptyHint}>Bấm Đăng tin mới để tạo tin tuyển dụng</Text>
             </View>
           ) : (
             myJobs.map((job) => (
@@ -329,22 +560,56 @@ export default function MyJobsScreen() {
                 </TouchableOpacity>
                 <View style={styles.jobActions}>
                   <TouchableOpacity
-                    style={[styles.jobBtnEdit, !canEditDelete(job.status) && styles.btnDisabled]}
-                    onPress={() => canEditDelete(job.status) ? startEdit(job) : Alert.alert('Thông báo', 'Tin đang chờ admin duyệt. Chỉ sửa được sau khi duyệt.')}
+                    style={[styles.jobBtnAction, !canReviewApplicants(job) && styles.btnDisabled]}
+                    onPress={() => {
+                      if (!canReviewApplicants(job)) {
+                        Alert.alert('Thông báo', 'Chỉ xem ứng viên khi job đang tuyển.');
+                        return;
+                      }
+                      setApplicantsJob(job);
+                      setShowApplicantsModal(true);
+                    }}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.jobBtnEditText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Sửa</Text>
+                    <Text style={[styles.jobBtnActionText, !canReviewApplicants(job) && { color: '#9CA3AF' }]}>
+                      Ứng viên
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.jobBtnDelete, !canEditDelete(job.status) && styles.btnDisabled]}
-                    onPress={() => canEditDelete(job.status) ? handleDelete(job._id, job.title) : Alert.alert('Thông báo', 'Tin đang chờ admin duyệt. Chỉ xóa được sau khi duyệt.')}
+                    style={[styles.jobBtnAction, !canComplete(job) && styles.btnDisabled]}
+                    onPress={() =>
+                      canComplete(job)
+                        ? handleComplete(job)
+                        : Alert.alert(
+                            'Thông báo',
+                            job.status === 'done'
+                              ? 'Job đã hoàn thành.'
+                              : 'Cần có worker được gán trước khi set done.',
+                          )
+                    }
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.jobBtnDeleteText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Xóa</Text>
+                    <Text style={[styles.jobBtnActionText, !canComplete(job) && { color: '#9CA3AF' }]}>
+                      Set done
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.jobBtnAction, !canEditDelete(job.status) && styles.btnDisabled]}
+                    onPress={() => canEditDelete(job.status) ? startEdit(job) : Alert.alert('Thông báo', 'Chỉ chỉnh sửa khi job đang ở trạng thái đang tuyển.')}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.jobBtnActionText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Sửa</Text>
                   </TouchableOpacity>
                 </View>
+                <TouchableOpacity
+                  style={[styles.deleteInlineBtn, !canEditDelete(job.status) && styles.btnDisabled]}
+                  onPress={() => canEditDelete(job.status) ? handleDelete(job._id, job.title) : Alert.alert('Thông báo', 'Chỉ xóa khi job đang ở trạng thái đang tuyển.')}
+                >
+                  <Text style={[styles.deleteInlineBtnText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Xóa</Text>
+                </TouchableOpacity>
               </View>
             ))
           )}
@@ -365,7 +630,7 @@ export default function MyJobsScreen() {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{selectedJob.title}</Text>
                   <TouchableOpacity onPress={() => setSelectedJob(null)} style={styles.modalCloseBtn}>
-                    <Text style={styles.modalCloseText}>✕</Text>
+                    <Ionicons name="close" size={18} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -391,6 +656,24 @@ export default function MyJobsScreen() {
                       </Text>
                     </View>
                   </View>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Deadline tự động hoàn thành</Text>
+                    <Text style={styles.detailValue}>{formatDateTime(selectedJob.completionDueAt)}</Text>
+                  </View>
+                  {selectedJob.status === 'done' && (
+                    <>
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailLabel}>Thời điểm hoàn thành</Text>
+                        <Text style={styles.detailValue}>{formatDateTime(selectedJob.completedAt)}</Text>
+                      </View>
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailLabel}>Nguồn hoàn thành</Text>
+                        <Text style={styles.detailValue}>
+                          {getCompletionSourceLabel(selectedJob.completionSource)}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                   {(selectedJob.skillTags?.length ?? 0) > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>Kỹ năng yêu cầu</Text>
@@ -409,18 +692,22 @@ export default function MyJobsScreen() {
                       {selectedJob.location?.lat?.toFixed(4)}, {selectedJob.location?.lng?.toFixed(4)}
                     </Text>
                   </View>
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailLabel}>Ngày giờ làm</Text>
+                    <Text style={styles.detailValue}>{formatDateTime(selectedJob.scheduledAt ?? null)}</Text>
+                  </View>
                 </ScrollView>
                 <View style={styles.modalFooter}>
                   <TouchableOpacity
-                    style={[styles.btn, styles.btnPrimary, { flex: 1 }, !canEditDelete(selectedJob.status) && styles.btnDisabled]}
+                    style={[styles.btn, styles.btnPrimary, styles.modalActionBtn, !canEditDelete(selectedJob.status) && styles.btnDisabled]}
                     onPress={() => {
                       if (canEditDelete(selectedJob.status)) { startEdit(selectedJob); setSelectedJob(null); }
-                      else Alert.alert('Thông báo', 'Tin đang chờ admin duyệt.');
+                      else Alert.alert('Thông báo', 'Chỉ chỉnh sửa khi job đang ở trạng thái đang tuyển.');
                     }}
                   >
                     <Text style={[styles.btnPrimaryText, !canEditDelete(selectedJob.status) && { color: '#9CA3AF' }]}>Chỉnh sửa</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.btn, styles.btnOutline, { flex: 1 }]} onPress={() => setSelectedJob(null)}>
+                  <TouchableOpacity style={[styles.btn, styles.btnOutline, styles.modalActionBtn]} onPress={() => setSelectedJob(null)}>
                     <Text style={styles.btnOutlineText}>Đóng</Text>
                   </TouchableOpacity>
                 </View>
@@ -429,6 +716,128 @@ export default function MyJobsScreen() {
           </TouchableOpacity>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={showApplicantsModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowApplicantsModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowApplicantsModal(false)}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ứng viên theo điểm</Text>
+              <TouchableOpacity onPress={() => setShowApplicantsModal(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.applicantHeader}>
+                <Text style={styles.detailLabel}>
+                  {applicantsJob?.title ?? 'Job'} - {applicants.length} ứng viên
+                </Text>
+                {applicantsJob && (
+                  <TouchableOpacity
+                    style={styles.applicantRefreshBtn}
+                    onPress={() => loadApplicants(applicantsJob._id)}
+                  >
+                    <Text style={styles.applicantRefreshText}>Tải lại</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {loadingApplicants ? (
+                <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 14 }} />
+              ) : applicants.length === 0 ? (
+                <Text style={styles.detailValue}>
+                  Chưa có ứng viên pending. Kiểm tra worker đã apply chưa và job còn open/partial.
+                </Text>
+              ) : (
+                [...applicants]
+                  .sort((a, b) => {
+                    const scoreA = normalizeScore(a.score);
+                    const scoreB = normalizeScore(b.score);
+                    if (scoreB !== scoreA) return scoreB - scoreA;
+                    return (b.worker?.rating ?? 0) - (a.worker?.rating ?? 0);
+                  })
+                  .map((row, idx) => {
+                    const workerId = row.apply.workerId;
+                    const checked = selectedWorkerIds.includes(workerId);
+                    const displayScore = normalizeScore(row.score);
+                    return (
+                      <TouchableOpacity
+                        key={row.apply._id}
+                        style={[styles.applicantRow, checked && styles.applicantRowSelected]}
+                        onPress={() => toggleWorker(workerId)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.applicantName}>
+                            #{idx + 1} {row.worker?.name ?? 'Worker'}
+                          </Text>
+                          <Text style={styles.applicantMeta}>
+                            Score: {displayScore.toFixed(2)} | Rating: {(row.worker?.rating ?? 0).toFixed(1)} | Jobs: {row.worker?.completedJobs ?? 0}
+                          </Text>
+                        </View>
+                        <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                          <Text style={[styles.checkboxText, checked && styles.checkboxTextChecked]}>
+                            {checked ? '✓' : ''}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+              )}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSecondary, styles.modalActionBtn]}
+                onPress={handleSelectWorkers}
+              >
+                <Text style={styles.btnSecondaryText}>Chọn ứng viên</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnOutline, styles.modalActionBtn]}
+                onPress={() => setShowApplicantsModal(false)}
+              >
+                <Text style={styles.btnOutlineText}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showDateTimePicker}
+        animationType="fade"
+        transparent
+        onRequestClose={cancelPickerValue}
+      >
+        <Pressable style={styles.modalOverlay} onPress={cancelPickerValue}>
+          <TouchableOpacity style={styles.pickerModalContent} activeOpacity={1} onPress={() => {}}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>
+                {pickerMode === 'date' ? 'Chọn ngày làm' : 'Chọn giờ làm'}
+              </Text>
+            </View>
+            <DateTimePicker
+              value={pickerValue}
+              mode={pickerMode}
+              is24Hour
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handlePickerChange}
+            />
+            <View style={styles.pickerModalFooter}>
+              <TouchableOpacity style={[styles.btn, styles.btnOutline, styles.modalActionBtn]} onPress={cancelPickerValue}>
+                <Text style={styles.btnOutlineText}>Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.btn, styles.btnPrimary, styles.modalActionBtn]} onPress={confirmPickerValue}>
+                <Text style={styles.btnPrimaryText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
+      <UserBottomBar navigation={navigation} active="MyJobs" />
     </SafeAreaView>
   );
 }
@@ -463,7 +872,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text },
   headerSubtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 44 },
+  scrollContent: { padding: 20, paddingBottom: 150 },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 20,
@@ -491,6 +900,18 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  pickerInput: { justifyContent: 'center' },
+  pickerValue: { color: COLORS.text, fontSize: 16 },
+  pickerPlaceholder: { color: COLORS.textMuted, fontSize: 16 },
+  pickerModalContent: {
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
+    marginHorizontal: 22,
+    padding: 14,
+  },
+  pickerModalHeader: { paddingHorizontal: 6, paddingBottom: 6 },
+  pickerModalTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, textAlign: 'center' },
+  pickerModalFooter: { flexDirection: 'row', gap: 10, marginTop: 8 },
   row: { flexDirection: 'row' },
   btnRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginTop: 4 },
   btn: { paddingVertical: 16, paddingHorizontal: 22, borderRadius: 14, alignItems: 'center' },
@@ -533,24 +954,27 @@ const styles = StyleSheet.create({
   jobCardFooter: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   jobPrice: { fontSize: 17, fontWeight: '800', color: COLORS.primary, marginRight: 18 },
   jobMetaText: { fontSize: 13, color: COLORS.textMuted },
-  jobActions: { flexDirection: 'row', gap: 12 },
-  jobBtnEdit: {
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 22,
-    paddingVertical: 14,
-    borderRadius: 12,
-    minHeight: 46,
+  jobActions: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  jobBtnAction: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 9,
+    borderRadius: 10,
+    minHeight: 36,
+    alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
   },
-  jobBtnEditText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: 14 },
-  jobBtnDelete: {
+  jobBtnActionText: { color: COLORS.textSecondary, fontWeight: '700', fontSize: 13 },
+  deleteInlineBtn: {
+    alignSelf: 'flex-end',
     backgroundColor: COLORS.errorLight,
-    paddingHorizontal: 22,
-    paddingVertical: 14,
-    borderRadius: 12,
-    minHeight: 46,
-    justifyContent: 'center',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
+  deleteInlineBtnText: { color: COLORS.error, fontSize: 12, fontWeight: '700' },
   btnDisabled: { opacity: 0.6 },
   jobBtnDeleteText: { color: COLORS.error, fontWeight: '700', fontSize: 14 },
   modalOverlay: {
@@ -585,17 +1009,62 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  modalCloseText: { fontSize: 18, color: COLORS.textMuted, fontWeight: '600' },
   modalBody: { maxHeight: 400, padding: 20 },
   modalFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 14,
     padding: 22,
     paddingTop: 18,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
   },
+  modalActionBtn: {
+    flexGrow: 1,
+    minWidth: 120,
+  },
   detailSection: { marginBottom: 20 },
+  applicantHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  applicantRefreshBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryLight,
+  },
+  applicantRefreshText: { color: COLORS.primaryDark, fontWeight: '600', fontSize: 12 },
+  applicantRow: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FAFAF9',
+  },
+  applicantRowSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
+  },
+  applicantName: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  applicantMeta: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxChecked: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  checkboxText: { fontSize: 13, color: COLORS.textMuted, fontWeight: '700' },
+  checkboxTextChecked: { color: '#FFFFFF' },
   detailRow: { flexDirection: 'row', gap: 20, marginBottom: 20 },
   detailItem: { flex: 1 },
   detailLabel: { fontSize: 13, color: COLORS.textMuted, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase' },

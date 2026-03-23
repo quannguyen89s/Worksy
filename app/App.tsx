@@ -2,21 +2,20 @@ import '@/bootstrapNative';
 import 'react-native-gesture-handler';
 import './global.css';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
+import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-
 import type { RootStackParamList } from '@/navigation/types';
+import HomeScreen from '@/screens/HomeScreen';
 import LoginScreen from '@/components/authScreens/LoginScreen';
 import RegisterScreen from '@/components/authScreens/RegisterScreen';
-import HomeScreen from '@/screens/HomeScreen';
 import MyJobsScreen from '@/screens/MyJobsScreen';
 import BrowseJobsScreen from '@/screens/BrowseJobsScreen';
+import WorkerAppliesScreen from '@/screens/WorkerAppliesScreen';
 import AdminDashboardScreen from '@/screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '@/screens/admin/AdminUsersScreen';
 import AdminJobsScreen from '@/screens/admin/AdminJobsScreen';
 import AdminSettingsScreen from '@/screens/admin/AdminSettingsScreen';
-import AdminAlertsScreen from '@/screens/admin/AdminAlertsScreen';
-
+import AdminAlertsScreen from './src/screens/admin/AdminAlertsScreen';
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
@@ -32,9 +31,21 @@ export default function App() {
           }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="BrowseJobs" component={BrowseJobsScreen} />
-          <Stack.Screen name="MyJobs" component={MyJobsScreen} />
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="BrowseJobs"
+            component={BrowseJobsScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="MyJobs"
+            component={MyJobsScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
           <Stack.Screen
             name="AdminDashboard"
             component={AdminDashboardScreen}
@@ -54,6 +65,11 @@ export default function App() {
           <Stack.Screen
             name="AdminAlerts"
             component={AdminAlertsScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="WorkerApplies"
+            component={WorkerAppliesScreen}
             options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
           />
         </Stack.Navigator>

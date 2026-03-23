@@ -1,7 +1,11 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import dns from "node:dns";
 
 dotenv.config();
+
+// Workaround for environments where the system DNS cannot resolve MongoDB SRV records.
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const URL = process.env.MONGO_URI || "";
 

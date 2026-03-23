@@ -1,32 +1,71 @@
+import { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
+import * as SecureStore from 'expo-secure-store';
+import authService from '@/services/authService';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      const accessToken = await SecureStore.getItemAsync('accessToken');
+      if (accessToken) {
+        await authService.logout(accessToken);
+      }
+    } catch {
+      // Always clear local auth data even if server logout fails.
+    } finally {
+      await Promise.all([
+        SecureStore.deleteItemAsync('accessToken'),
+        SecureStore.deleteItemAsync('refreshToken'),
+      ]);
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.logo}>Worksy</Text>
-          <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
-        </View>
-      </View>
+      <UserHeader
+        title="Worksy"
+        subtitle="Chào mừng bạn trở lại"
+        leftIcon="menu"
+        onLeftPress={() => {}}
+        rightLabel={loggingOut ? 'Đang thoát...' : 'Đăng xuất'}
+        onRightPress={handleLogout}
+      />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 10) + 92 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
-              <Text style={styles.actionIcon}>🔍</Text>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('BrowseJobs')}
+            >
+              <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Tìm việc</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
-              <Text style={styles.actionIcon}>📝</Text>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('MyJobs')}
+            >
+              <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Đăng tin</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -34,8 +73,16 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('MyJobs')}
             >
-              <Text style={styles.actionIcon}>📋</Text>
+              <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Tin của tôi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('WorkerApplies')}
+            >
+              <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
+              <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -57,11 +104,12 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>📌</Text>
+            <Ionicons name="pricetag-outline" size={34} color={COLORS.textMuted} />
             <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
           </View>
         </View>
       </ScrollView>
+      <UserBottomBar navigation={navigation} active="Home" />
     </SafeAreaView>
   );
 }
@@ -69,6 +117,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 22,
     backgroundColor: COLORS.card,
@@ -80,6 +131,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  logoutBtn: {
+    backgroundColor: COLORS.error,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minWidth: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutBtnDisabled: { opacity: 0.8 },
+  logoutBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   logo: { fontSize: 30, fontWeight: '800', color: COLORS.text, letterSpacing: -0.3 },
   greeting: { fontSize: 15, color: COLORS.textMuted, marginTop: 6 },
   scroll: { flex: 1 },
@@ -110,7 +172,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(180, 83, 9, 0.15)',
   },
-  actionIcon: { fontSize: 28, marginBottom: 8 },
   actionBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: 14 },
   statsRow: { flexDirection: 'row', gap: 14 },
   statBox: {
@@ -132,6 +193,5 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderStyle: 'dashed',
   },
-  emptyIcon: { fontSize: 40, marginBottom: 12, opacity: 0.5 },
   emptyText: { fontSize: 15, color: COLORS.textMuted },
 });
