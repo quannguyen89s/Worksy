@@ -1,6 +1,4 @@
-import { NextFunction, Request, Response } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import { checkSchema } from "express-validator";
+import { checkSchema, type Meta } from "express-validator";
 import userModel from "../models/user.model";
 import { validate } from "../utils/validation";
 
@@ -93,7 +91,7 @@ const registerValidator = checkSchema({
             errorMessage: "Xác nhận mật khẩu không được để trống",
         },
         custom: {
-            options: (value, { req }) => {
+            options: (value: unknown, { req }: Meta) => {
                 if (value !== req.body.password) {
                     throw new Error("Xác nhận mật khẩu không khớp");
                 }
