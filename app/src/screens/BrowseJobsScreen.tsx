@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  Alert,
   ActivityIndicator,
   StyleSheet,
   Modal,
@@ -49,6 +50,11 @@ const STATUS_LABELS: Record<string, string> = {
   done: 'Hoàn thành',
 };
 
+const COMPLETION_SOURCE_LABELS: Record<string, string> = {
+  manual: 'Khách hàng hoàn thành',
+  auto: 'Tự động hoàn thành',
+};
+
 export default function BrowseJobsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,6 +67,8 @@ export default function BrowseJobsScreen() {
   const [search, setSearch] = useState('');
   const [showFilter, setShowFilter] = useState(false);
   const [selectedJob, setSelectedJob] = useState<jobApi.Job | null>(null);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
+  const [appliedByJob, setAppliedByJob] = useState<Record<string, { applyId: string; status: jobApi.Apply['status'] }>>({});
   const [filters, setFilters] = useState({
     statusIds: ['open', 'partial', 'full'] as string[],
     minPrice: '',
@@ -110,6 +118,27 @@ export default function BrowseJobsScreen() {
     [accessToken, search, filters],
   );
 
+  const fetchMyApplies = useCallback(async () => {
+    if (!accessToken.trim()) {
+      setAppliedByJob({});
+      return;
+    }
+    try {
+      const applies = await jobApi.listMyApplies(accessToken.trim());
+      const map: Record<string, { applyId: string; status: jobApi.Apply['status'] }> = {};
+      for (const row of applies) {
+        const jobId = typeof row.jobId === 'string' ? row.jobId : row.jobId?._id;
+        if (!jobId) continue;
+        if (row.status === 'pending' || row.status === 'accepted') {
+          map[jobId] = { applyId: row._id, status: row.status };
+        }
+      }
+      setAppliedByJob(map);
+    } catch {
+      setAppliedByJob({});
+    }
+  }, [accessToken]);
+
   useFocusEffect(
     useCallback(() => {
       loadToken();
@@ -119,6 +148,7 @@ export default function BrowseJobsScreen() {
   // Realtime search: debounce fetch when search/filters change
   useEffect(() => {
     if (!accessToken) return;
+    void fetchMyApplies();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
@@ -127,7 +157,7 @@ export default function BrowseJobsScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [accessToken, search, filters, fetchJobs]);
+  }, [accessToken, search, filters, fetchJobs, fetchMyApplies]);
 
   const applyFilterAndClose = useCallback(() => {
     setShowFilter(false);
@@ -172,6 +202,84 @@ export default function BrowseJobsScreen() {
       done: '#6B7280',
     };
     return map[status] ?? '#6B7280';
+  };
+
+  const getApplyState = (jobId: string) => appliedByJob[jobId];
+  const isApplied = (jobId: string) => Boolean(getApplyState(jobId));
+  const canCancelApply = (jobId: string) => getApplyState(jobId)?.status === 'pending';
+  const canApply = (job: jobApi.Job) =>
+    (job.status === 'open' || job.status === 'partial') && !isApplied(job._id);
+
+  const confirmApply = (job: jobApi.Job) => {
+    Alert.alert(
+      'Xác nhận ứng tuyển',
+      `Bạn muốn ứng tuyển job "${job.title}"?`,
+      [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Ứng tuyển', onPress: () => void handleApply(job) },
+      ],
+    );
+  };
+
+  const handleApply = async (job: jobApi.Job) => {
+    if (!accessToken.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng đăng nhập để ứng tuyển.');
+      return;
+    }
+    if (!canApply(job)) {
+      Alert.alert('Thông báo', 'Công việc này hiện không thể ứng tuyển.');
+      return;
+    }
+    setApplyingJobId(job._id);
+    try {
+      await jobApi.applyJob(accessToken.trim(), { jobId: job._id });
+      Alert.alert('Thành công', 'Đã gửi đơn ứng tuyển.');
+      await fetchJobs(page);
+      await fetchMyApplies();
+    } catch (err: unknown) {
+      Alert.alert('Lỗi', jobApi.getErrorMessage(err));
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
+
+  const handleCancelApply = (job: jobApi.Job) => {
+    const applyState = getApplyState(job._id);
+    if (!applyState || applyState.status !== 'pending') {
+      Alert.alert('Thông báo', 'Đơn này không thể hủy.');
+      return;
+    }
+    Alert.alert(
+      'Xác nhận hủy ứng tuyển',
+      `Bạn muốn hủy đơn ứng tuyển job "${job.title}"?`,
+      [
+        { text: 'Không', style: 'cancel' },
+        {
+          text: 'Hủy đơn',
+          style: 'destructive',
+          onPress: async () => {
+            setApplyingJobId(job._id);
+            try {
+              await jobApi.cancelApply(accessToken.trim(), applyState.applyId);
+              Alert.alert('Thành công', 'Đã hủy đơn ứng tuyển.');
+              await fetchMyApplies();
+              await fetchJobs(page);
+            } catch (err: unknown) {
+              Alert.alert('Lỗi', jobApi.getErrorMessage(err));
+            } finally {
+              setApplyingJobId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '--';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '--';
+    return date.toLocaleString('vi-VN');
   };
 
   return (
@@ -271,7 +379,10 @@ export default function BrowseJobsScreen() {
                     {job.assignedWorkers}/{job.requiredWorkers} người
                   </Text>
                 </View>
-            {(job.skillTags?.length ?? 0) > 0 && (
+                {job.scheduledAt ? (
+                  <Text style={styles.jobScheduleText}>Lịch: {formatDateTime(job.scheduledAt)}</Text>
+                ) : null}
+                {(job.skillTags?.length ?? 0) > 0 && (
               <View style={styles.skillRow}>
                 {(job.skillTags ?? []).slice(0, 2).map((tag, i) => (
                   <View key={i} style={styles.skillTag}>
@@ -280,6 +391,25 @@ export default function BrowseJobsScreen() {
                 ))}
               </View>
             )}
+                <TouchableOpacity
+                  style={[
+                    styles.applyBtn,
+                    !canApply(job) && !canCancelApply(job._id) && styles.applyBtnDisabled,
+                  ]}
+                  activeOpacity={0.85}
+                  disabled={(!canApply(job) && !canCancelApply(job._id)) || applyingJobId === job._id}
+                  onPress={() => (canCancelApply(job._id) ? handleCancelApply(job) : confirmApply(job))}
+                >
+                  <Text style={[styles.applyBtnText, !canApply(job) && !canCancelApply(job._id) && styles.applyBtnTextDisabled]}>
+                    {applyingJobId === job._id
+                      ? 'Đang xử lý...'
+                      : canCancelApply(job._id)
+                        ? 'Hủy ứng tuyển'
+                        : isApplied(job._id)
+                          ? 'Đã được chọn'
+                          : 'Ứng tuyển'}
+                  </Text>
+                </TouchableOpacity>
           </TouchableOpacity>
             ))}
             {row.length === 1 && <View style={styles.cardSpacer} />}
@@ -469,6 +599,34 @@ export default function BrowseJobsScreen() {
                       {selectedJob.assignedWorkers}/{selectedJob.requiredWorkers} người
                     </Text>
                   </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Ngày giờ làm</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDateTime(selectedJob.scheduledAt)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Deadline auto done</Text>
+                    <Text style={styles.detailValue}>
+                      {formatDateTime(selectedJob.completionDueAt)}
+                    </Text>
+                  </View>
+                  {selectedJob.status === 'done' && (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Hoàn thành lúc</Text>
+                        <Text style={styles.detailValue}>
+                          {formatDateTime(selectedJob.completedAt)}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Nguồn hoàn thành</Text>
+                        <Text style={styles.detailValue}>
+                          {COMPLETION_SOURCE_LABELS[selectedJob.completionSource ?? ''] ?? '--'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                   {(selectedJob.skillTags?.length ?? 0) > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>Kỹ năng</Text>
@@ -484,7 +642,27 @@ export default function BrowseJobsScreen() {
                 </ScrollView>
                 <View style={styles.detailFooter}>
                   <TouchableOpacity
-                    style={[styles.btn, styles.btnPrimary, { flex: 1 }]}
+                    style={[
+                      styles.btn,
+                      styles.btnSecondary,
+                      styles.detailActionBtn,
+                      (!canApply(selectedJob) && !canCancelApply(selectedJob._id) || applyingJobId === selectedJob._id) && styles.pageBtnDisabled,
+                    ]}
+                    disabled={(!canApply(selectedJob) && !canCancelApply(selectedJob._id)) || applyingJobId === selectedJob._id}
+                    onPress={() => (canCancelApply(selectedJob._id) ? handleCancelApply(selectedJob) : confirmApply(selectedJob))}
+                  >
+                    <Text style={styles.btnSecondaryText}>
+                      {applyingJobId === selectedJob._id
+                        ? 'Đang xử lý...'
+                        : canCancelApply(selectedJob._id)
+                          ? 'Hủy ứng tuyển'
+                          : isApplied(selectedJob._id)
+                            ? 'Đã được chọn'
+                          : 'Ứng tuyển'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.btn, styles.btnPrimary, styles.detailActionBtn]}
                     onPress={() => setSelectedJob(null)}
                   >
                     <Text style={styles.btnPrimaryText}>Đóng</Text>
@@ -624,6 +802,25 @@ const styles = StyleSheet.create({
   jobCardFooter: { flexDirection: 'column', marginBottom: 8, gap: 2 },
   jobPrice: { fontSize: 15, fontWeight: '800', color: COLORS.primary },
   jobMeta: { fontSize: 13, color: COLORS.textMuted },
+  jobScheduleText: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 8 },
+  applyBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  applyBtnDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  applyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  applyBtnTextDisabled: {
+    color: COLORS.textMuted,
+  },
   skillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   skillTag: {
     backgroundColor: COLORS.primaryLight,
@@ -729,8 +926,14 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 16, fontWeight: '600', color: COLORS.text },
   detailFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     padding: 22,
+    gap: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
+  },
+  detailActionBtn: {
+    flexGrow: 1,
+    minWidth: 130,
   },
 });

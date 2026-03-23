@@ -1,12 +1,36 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
+import * as SecureStore from 'expo-secure-store';
+import authService from '@/services/authService';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      const accessToken = await SecureStore.getItemAsync('accessToken');
+      if (accessToken) {
+        await authService.logout(accessToken);
+      }
+    } catch {
+      // Always clear local auth data even if server logout fails.
+    } finally {
+      await Promise.all([
+        SecureStore.deleteItemAsync('accessToken'),
+        SecureStore.deleteItemAsync('refreshToken'),
+      ]);
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
@@ -15,17 +39,37 @@ export default function HomeScreen() {
           <Text style={styles.logo}>Worksy</Text>
           <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.logoutBtn, loggingOut && styles.logoutBtnDisabled]}
+          activeOpacity={0.85}
+          onPress={handleLogout}
+          disabled={loggingOut}
+        >
+          {loggingOut ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.logoutBtnText}>Đăng xuất</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('BrowseJobs')}
+            >
               <Text style={styles.actionIcon}>🔍</Text>
               <Text style={styles.actionBtnText}>Tìm việc</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('MyJobs')}
+            >
               <Text style={styles.actionIcon}>📝</Text>
               <Text style={styles.actionBtnText}>Đăng tin</Text>
             </TouchableOpacity>
@@ -36,6 +80,14 @@ export default function HomeScreen() {
             >
               <Text style={styles.actionIcon}>📋</Text>
               <Text style={styles.actionBtnText}>Tin của tôi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('WorkerApplies')}
+            >
+              <Text style={styles.actionIcon}>🧾</Text>
+              <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -69,6 +121,9 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingVertical: 22,
     backgroundColor: COLORS.card,
@@ -80,6 +135,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  logoutBtn: {
+    backgroundColor: COLORS.error,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    minWidth: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutBtnDisabled: { opacity: 0.8 },
+  logoutBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   logo: { fontSize: 30, fontWeight: '800', color: COLORS.text, letterSpacing: -0.3 },
   greeting: { fontSize: 15, color: COLORS.textMuted, marginTop: 6 },
   scroll: { flex: 1 },

@@ -21,6 +21,7 @@ export type JobCreateBody = {
   description: string;
   price: number;
   location: { lat: number; lng: number };
+  scheduledAt: string;
   requiredWorkers: number;
   skillTags?: string[];
 };
@@ -30,6 +31,7 @@ export type JobUpdateBody = {
   description?: string;
   price?: number;
   location?: { lat: number; lng: number };
+  scheduledAt?: string;
   requiredWorkers?: number;
   skillTags?: string[];
 };
@@ -40,6 +42,7 @@ export type Job = {
   description: string;
   price: number;
   location: { lat: number; lng: number };
+  scheduledAt?: string;
   requiredWorkers: number;
   assignedWorkers: number;
   skillTags?: string[];
@@ -47,6 +50,10 @@ export type Job = {
   createdBy: string;
   createdAt?: string;
   distanceKm?: number;
+  completedAt?: string | null;
+  completionDueAt?: string | null;
+  completionSource?: 'manual' | 'auto' | null;
+  autoDoneAfterHours?: number | null;
 };
 
 export type BrowseJobsParams = {
@@ -69,6 +76,52 @@ export type BrowseJobsResult = {
   page: number;
   limit: number;
 };
+
+export type Apply = {
+  _id: string;
+  jobId: Job | string;
+  workerId: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  priceOffer?: number;
+};
+
+export type RankedApplicant = {
+  apply: {
+    _id: string;
+    workerId: string;
+    priceOffer?: number;
+    status: 'pending' | 'accepted' | 'rejected';
+  };
+  worker: {
+    _id: string;
+    name?: string;
+    rating?: number;
+    completedJobs?: number;
+    skills?: string[];
+    location?: { lat: number; lng: number };
+  };
+  score: number;
+};
+
+function parseScore(raw: unknown): number {
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string') {
+    const normalized = raw.replace(',', '.').trim();
+    const n = Number(normalized);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (raw && typeof raw === 'object') {
+    const o = raw as {
+      $numberDecimal?: string;
+      $numberDouble?: string;
+      value?: number | string;
+    };
+    if (o.$numberDecimal) return parseScore(o.$numberDecimal);
+    if (o.$numberDouble) return parseScore(o.$numberDouble);
+    if (o.value != null) return parseScore(o.value);
+  }
+  return 0;
+}
 
 export async function browseJobs(
   accessToken: string,
@@ -126,5 +179,123 @@ export async function listMyJobs(accessToken: string): Promise<Job[]> {
   const { data } = await axios.get(`${API_BASE}/jobs/mine`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  return data.data;
+}
+
+export async function completeJob(accessToken: string, jobId: string): Promise<Job> {
+  const { data } = await axios.patch(
+    `${API_BASE}/jobs/${jobId}/complete`,
+    {},
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 15000,
+    },
+  );
+  return data.data;
+}
+
+export async function applyJob(
+  accessToken: string,
+  body: { jobId: string; priceOffer?: number },
+): Promise<{ _id: string; jobId: string; workerId: string; status: string; priceOffer?: number }> {
+  const { data } = await axios.post(`${API_BASE}/apply`, body, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    timeout: 15000,
+  });
+  return data.data;
+}
+
+export async function listMyApplies(accessToken: string): Promise<Apply[]> {
+  const { data } = await axios.get(`${API_BASE}/apply/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return data.data;
+}
+
+export async function cancelApply(
+  accessToken: string,
+  applyId: string,
+): Promise<{ deleted: boolean }> {
+  const { data } = await axios.delete(`${API_BASE}/apply/${applyId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return data.data;
+}
+
+export async function listApplicants(accessToken: string, jobId: string): Promise<RankedApplicant[]> {
+  const { data } = await axios.get(`${API_BASE}/jobs/${jobId}/applicants`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  return rows.map((row: unknown) => {
+    const r = (row ?? {}) as {
+      apply?: {
+        _id?: string;
+        workerId?: string | { _id?: string };
+        priceOffer?: number;
+        status?: 'pending' | 'accepted' | 'rejected';
+      };
+      worker?: {
+        _id?: string;
+        name?: string;
+        rating?: number;
+        completedJobs?: number;
+        skills?: string[];
+        location?: { lat: number; lng: number };
+      };
+      score?: number | string;
+    };
+
+    const workerId =
+      typeof r.apply?.workerId === 'string'
+        ? r.apply.workerId
+        : (r.apply?.workerId?._id ?? r.worker?._id ?? '');
+
+    const resolvedScore =
+      parseScore(r.score) ||
+      parseScore((r as { apply?: { score?: unknown } }).apply?.score);
+
+    return {
+      apply: {
+        _id: r.apply?._id ?? '',
+        workerId,
+        ...(r.apply?.priceOffer != null ? { priceOffer: r.apply.priceOffer } : {}),
+        status: r.apply?.status ?? 'pending',
+      },
+      worker: {
+        _id: r.worker?._id ?? workerId,
+        name: r.worker?.name,
+        rating: r.worker?.rating,
+        completedJobs: r.worker?.completedJobs,
+        skills: r.worker?.skills,
+        location: r.worker?.location,
+      },
+      score: resolvedScore,
+    } as RankedApplicant;
+  });
+}
+
+export async function selectWorkers(
+  accessToken: string,
+  jobId: string,
+  workerIds: string[],
+): Promise<Job> {
+  const { data } = await axios.post(
+    `${API_BASE}/jobs/${jobId}/select-workers`,
+    { workerIds },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    },
+  );
   return data.data;
 }

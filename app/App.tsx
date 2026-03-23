@@ -10,6 +10,7 @@ import LoginScreen from '@/components/authScreens/LoginScreen';
 import RegisterScreen from '@/components/authScreens/RegisterScreen';
 import MyJobsScreen from '@/screens/MyJobsScreen';
 import BrowseJobsScreen from '@/screens/BrowseJobsScreen';
+import WorkerAppliesScreen from '@/screens/WorkerAppliesScreen';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="BrowseJobs" component={BrowseJobsScreen} />
           <Stack.Screen name="MyJobs" component={MyJobsScreen} />
+          <Stack.Screen name="WorkerApplies" component={WorkerAppliesScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
