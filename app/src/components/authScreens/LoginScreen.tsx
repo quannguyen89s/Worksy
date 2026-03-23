@@ -11,13 +11,28 @@ import {
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import authService from '@/services/authService';
-import * as SecureStore from 'expo-secure-store';
-import { COLORS } from '@/theme/colors';
+import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
+import AuthService from '@/services/authService';
+import * as SecureStore from 'expo-secure-store';
+import { decodeJwtRole, setAdminToken } from '@/api/adminApi';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = StackScreenProps<RootStackParamList, 'Login'>;
+
+const COLORS = {
+  bg: '#FFF8E7',
+  card: '#FFFFFF',
+  primary: '#92400E',
+  primaryLight: '#F5E6D3',
+  text: '#3F3F46',
+  textLight: '#71717A',
+  textMuted: '#78716C',
+  textSecondary: '#57534E',
+  border: '#E4D5C3',
+  borderLight: '#F1E7DA',
+  error: '#DC2626',
+  errorLight: '#FEE2E2',
+};
 
 export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
@@ -35,12 +50,29 @@ export default function LoginScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      const result = await authService.login(email.trim(), password);
-      await SecureStore.setItemAsync('accessToken', result.accessToken);
-      await SecureStore.setItemAsync('refreshToken', result.refreshToken);
-      if (result.user?.role === 'worker') {
-        navigation.reset({ index: 0, routes: [{ name: 'BrowseJobs' }] });
+      const data = await AuthService.login(email.trim(), password);
+      const accessToken = data?.result?.accessToken ?? data?.accessToken;
+      const refreshToken = data?.result?.refreshToken ?? data?.refreshToken;
+      if (!accessToken) {
+        setErrorMsg(data?.result?.message ?? data?.message ?? 'Đăng nhập thất bại. Vui lòng thử lại.');
+        return;
+      }
+
+      // Lưu token cho flow user hiện tại
+      await SecureStore.setItemAsync('accessToken', accessToken);
+      if (refreshToken) {
+        await SecureStore.setItemAsync('refreshToken', refreshToken);
       } else {
+        await SecureStore.deleteItemAsync('refreshToken');
+      }
+
+      // Nếu là admin thì vào dashboard admin ngay
+      const role = decodeJwtRole(accessToken);
+      if (role === 'admin') {
+        await setAdminToken(accessToken);
+        navigation.reset({ index: 0, routes: [{ name: 'AdminDashboard' }] });
+      } else {
+        await setAdminToken(null);
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       }
     } catch (error: any) {

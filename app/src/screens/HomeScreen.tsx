@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
 import authService from '@/services/authService';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -34,26 +39,16 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.logo}>Worksy</Text>
-          <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.logoutBtn, loggingOut && styles.logoutBtnDisabled]}
-          activeOpacity={0.85}
-          onPress={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.logoutBtnText}>Đăng xuất</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <UserHeader
+        title="Worksy"
+        subtitle="Chào mừng bạn trở lại"
+        leftIcon="menu"
+        onLeftPress={() => {}}
+        rightLabel={loggingOut ? 'Đang thoát...' : 'Đăng xuất'}
+        onRightPress={handleLogout}
+      />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 10) + 92 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
@@ -62,7 +57,7 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('BrowseJobs')}
             >
-              <Text style={styles.actionIcon}>🔍</Text>
+              <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Tìm việc</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -70,7 +65,7 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('MyJobs')}
             >
-              <Text style={styles.actionIcon}>📝</Text>
+              <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Đăng tin</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -78,7 +73,7 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('MyJobs')}
             >
-              <Text style={styles.actionIcon}>📋</Text>
+              <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Tin của tôi</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -86,7 +81,7 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               onPress={() => navigation.navigate('WorkerApplies')}
             >
-              <Text style={styles.actionIcon}>🧾</Text>
+              <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
             </TouchableOpacity>
           </View>
@@ -109,11 +104,12 @@ export default function HomeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>📌</Text>
+            <Ionicons name="pricetag-outline" size={34} color={COLORS.textMuted} />
             <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
           </View>
         </View>
       </ScrollView>
+      <UserBottomBar navigation={navigation} active="Home" />
     </SafeAreaView>
   );
 }
@@ -176,7 +172,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(180, 83, 9, 0.15)',
   },
-  actionIcon: { fontSize: 28, marginBottom: 8 },
   actionBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: 14 },
   statsRow: { flexDirection: 'row', gap: 14 },
   statBox: {
@@ -198,6 +193,5 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderStyle: 'dashed',
   },
-  emptyIcon: { fontSize: 40, marginBottom: 12, opacity: 0.5 },
   emptyText: { fontSize: 15, color: COLORS.textMuted },
 });

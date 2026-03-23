@@ -2,15 +2,20 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Modal, Pressable, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import * as SecureStore from 'expo-secure-store';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import * as jobApi from '@/api/jobApi';
 import { COLORS } from '@/theme/colors';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import type { RootStackParamList } from '@/navigation/types';
 
 const { getErrorMessage } = jobApi;
 
 export default function MyJobsScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [accessToken, setAccessToken] = useState('');
   const [myJobs, setMyJobs] = useState<jobApi.Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -411,16 +416,12 @@ export default function MyJobsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerText}>
-          <Text style={styles.headerTitle}>Tin của tôi</Text>
-          <Text style={styles.headerSubtitle}>Quản lý tin tuyển dụng</Text>
-        </View>
-      </View>
+      <UserHeader
+        title="Tin của tôi"
+        subtitle="Quản lý tin tuyển dụng"
+        leftIcon="menu"
+        onLeftPress={() => navigation.navigate('Home' as never)}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -629,7 +630,7 @@ export default function MyJobsScreen() {
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>{selectedJob.title}</Text>
                   <TouchableOpacity onPress={() => setSelectedJob(null)} style={styles.modalCloseBtn}>
-                    <Text style={styles.modalCloseText}>✕</Text>
+                    <Ionicons name="close" size={18} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -727,7 +728,7 @@ export default function MyJobsScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ứng viên theo điểm</Text>
               <TouchableOpacity onPress={() => setShowApplicantsModal(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
+                <Ionicons name="close" size={18} color={COLORS.textMuted} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
@@ -836,6 +837,7 @@ export default function MyJobsScreen() {
           </TouchableOpacity>
         </Pressable>
       </Modal>
+      <UserBottomBar navigation={navigation} active="MyJobs" />
     </SafeAreaView>
   );
 }
@@ -870,7 +872,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text },
   headerSubtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 44 },
+  scrollContent: { padding: 20, paddingBottom: 150 },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 20,
@@ -1007,7 +1009,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  modalCloseText: { fontSize: 18, color: COLORS.textMuted, fontWeight: '600' },
   modalBody: { maxHeight: 400, padding: 20 },
   modalFooter: {
     flexDirection: 'row',

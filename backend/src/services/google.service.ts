@@ -38,12 +38,17 @@ export const googleLoginService = async (idToken: string) => {
             googleId,
             avatar: picture || "",
             isVerified: true,
+            isDeleted: false,
         });
     } else if (!user.googleId) {
         await userModel.updateOne(
             { _id: user._id },
             { googleId, isVerified: true, avatar: user.avatar || picture || "" }
         );
+    }
+
+    if (user.isDeleted) {
+        throw new AppError("User account has been deleted", HTTP_STATUS.FORBIDDEN);
     }
 
     const [accessToken, refreshToken] = await Promise.all([

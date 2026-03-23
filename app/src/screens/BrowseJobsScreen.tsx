@@ -16,11 +16,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
 import * as jobApi from '@/api/jobApi';
 import { COLORS } from '@/theme/colors';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 const CARD_GAP = 10;
 const LIMIT_PER_PAGE = 10;
@@ -56,7 +60,8 @@ const COMPLETION_SOURCE_LABELS: Record<string, string> = {
 };
 
 export default function BrowseJobsScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [accessToken, setAccessToken] = useState('');
   const [jobs, setJobs] = useState<jobApi.Job[]>([]);
@@ -76,6 +81,7 @@ export default function BrowseJobsScreen() {
     skillTags: '',
     sort: 'date_desc' as jobApi.BrowseJobsParams['sort'],
   });
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const loadToken = useCallback(async () => {
     const token = await SecureStore.getItemAsync('accessToken');
@@ -169,16 +175,6 @@ export default function BrowseJobsScreen() {
     fetchJobs(1);
   }, [fetchJobs]);
 
-  const goToPage = useCallback(
-    (newPage: number) => {
-      const totalPages = Math.ceil(total / LIMIT_PER_PAGE) || 1;
-      if (newPage < 1 || newPage > totalPages) return;
-      fetchJobs(newPage);
-    },
-    [total, fetchJobs],
-  );
-
-  const totalPages = Math.ceil(total / LIMIT_PER_PAGE) || 1;
   const toggleStatus = (id: string) => {
     setFilters((f) =>
       f.statusIds.includes(id) ? { ...f, statusIds: f.statusIds.filter((s) => s !== id) } : { ...f, statusIds: [...f.statusIds, id] },
@@ -284,16 +280,14 @@ export default function BrowseJobsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Tìm việc làm</Text>
-          <Text style={styles.headerSubtitle}>Các tin tuyển đang mở</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutBtnText}>Đăng xuất</Text>
-        </TouchableOpacity>
-      </View>
+      <UserHeader
+        title="Tìm việc làm"
+        subtitle="Các tin tuyển đang mở"
+        leftIcon="menu"
+        onLeftPress={() => navigation.navigate('Home')}
+        rightLabel="Đăng xuất"
+        onRightPress={handleLogout}
+      />
 
       {/* Search + Filter */}
       <View style={styles.searchCard}>
@@ -310,7 +304,40 @@ export default function BrowseJobsScreen() {
             style={styles.filterBtn}
             onPress={() => setShowFilter(true)}
           >
-            <Text style={styles.filterBtnText}>⚙️ Lọc</Text>
+            <View style={styles.filterBtnInner}>
+              <Ionicons name="options-outline" size={16} color={COLORS.primaryDark} />
+              <Text style={styles.filterBtnText}>Lọc</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.viewModeRow}>
+          <TouchableOpacity
+            style={[styles.viewModeBtn, viewMode === 'grid' && styles.viewModeBtnActive]}
+            onPress={() => setViewMode('grid')}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={15}
+              color={viewMode === 'grid' ? COLORS.primaryDark : COLORS.textMuted}
+            />
+            <Text style={[styles.viewModeText, viewMode === 'grid' && styles.viewModeTextActive]}>
+              Lưới
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewModeBtn, viewMode === 'list' && styles.viewModeBtnActive]}
+            onPress={() => setViewMode('list')}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="list-outline"
+              size={15}
+              color={viewMode === 'list' ? COLORS.primaryDark : COLORS.textMuted}
+            />
+            <Text style={[styles.viewModeText, viewMode === 'list' && styles.viewModeTextActive]}>
+              List
+            </Text>
           </TouchableOpacity>
         </View>
         {loading && (
@@ -321,23 +348,19 @@ export default function BrowseJobsScreen() {
         )}
       </View>
 
-      {/* Job list - Grid 2 cột (nhóm thủ công theo hàng) */}
+      {/* Job list */}
       <FlatList
-        data={(() => {
-          const rows: jobApi.Job[][] = [];
-          for (let i = 0; i < jobs.length; i += 2) {
-            rows.push(jobs.slice(i, i + 2));
-          }
-          return rows;
-        })()}
-        keyExtractor={(row) => row.map((j) => j._id).join('-')}
+        key={viewMode}
+        data={jobs}
+        keyExtractor={(job) => job._id}
+        numColumns={viewMode === 'grid' ? 2 : 1}
         style={styles.list}
         contentContainerStyle={[styles.scrollContent, jobs.length === 0 && styles.emptyList]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🔍</Text>
+              <Ionicons name="search-outline" size={42} color={COLORS.textMuted} />
               <Text style={styles.emptyText}>Chưa có tin nào phù hợp</Text>
               <Text style={styles.emptyHint}>Thử thay đổi từ khóa hoặc bộ lọc</Text>
             </View>
@@ -346,99 +369,78 @@ export default function BrowseJobsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
         }
-        renderItem={({ item: row }) => (
-          <View style={styles.cardRow}>
-            {row.map((job, idx) => (
-              <TouchableOpacity
-                key={job._id}
-                style={[styles.jobCard, idx === 0 && row.length > 1 && styles.jobCardLeft]}
-                activeOpacity={0.7}
-                onPress={() => setSelectedJob(job)}
-              >
-                <View style={styles.jobCardHeader}>
-                  <Text style={styles.jobTitle} numberOfLines={2}>
-                    {job.title}
-                  </Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: getStatusColor(job.status) + '20' },
-                    ]}
-                  >
-                    <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) }]}>
-                      {STATUS_LABELS[job.status] ?? job.status}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.jobDesc} numberOfLines={2}>
-                  {job.description}
+        columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
+        renderItem={({ item: job }) => (
+          <TouchableOpacity
+            style={[
+              styles.jobCard,
+              viewMode === 'grid' ? styles.jobCardGrid : styles.jobCardList,
+            ]}
+            activeOpacity={0.7}
+            onPress={() => setSelectedJob(job)}
+          >
+            <View style={styles.jobCardContent}>
+              <View style={styles.jobCardHeader}>
+                <Text style={styles.jobTitle} numberOfLines={2}>
+                  {job.title}
                 </Text>
-                <View style={styles.jobCardFooter}>
-                  <Text style={styles.jobPrice}>{job.price?.toLocaleString('vi-VN')}</Text>
-                  <Text style={styles.jobMeta}>
-                    {job.assignedWorkers}/{job.requiredWorkers} người
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(job.status) + '20' },
+                  ]}
+                >
+                  <Text style={[styles.statusBadgeText, { color: getStatusColor(job.status) }]}>
+                    {STATUS_LABELS[job.status] ?? job.status}
                   </Text>
                 </View>
-                {job.scheduledAt ? (
-                  <Text style={styles.jobScheduleText}>Lịch: {formatDateTime(job.scheduledAt)}</Text>
-                ) : null}
-                {(job.skillTags?.length ?? 0) > 0 && (
-              <View style={styles.skillRow}>
-                {(job.skillTags ?? []).slice(0, 2).map((tag, i) => (
-                  <View key={i} style={styles.skillTag}>
-                    <Text style={styles.skillTagText} numberOfLines={1}>{tag}</Text>
-                  </View>
-                ))}
               </View>
-            )}
-                <TouchableOpacity
-                  style={[
-                    styles.applyBtn,
-                    !canApply(job) && !canCancelApply(job._id) && styles.applyBtnDisabled,
-                  ]}
-                  activeOpacity={0.85}
-                  disabled={(!canApply(job) && !canCancelApply(job._id)) || applyingJobId === job._id}
-                  onPress={() => (canCancelApply(job._id) ? handleCancelApply(job) : confirmApply(job))}
-                >
-                  <Text style={[styles.applyBtnText, !canApply(job) && !canCancelApply(job._id) && styles.applyBtnTextDisabled]}>
-                    {applyingJobId === job._id
-                      ? 'Đang xử lý...'
-                      : canCancelApply(job._id)
-                        ? 'Hủy ứng tuyển'
-                        : isApplied(job._id)
-                          ? 'Đã được chọn'
-                          : 'Ứng tuyển'}
-                  </Text>
-                </TouchableOpacity>
+              <Text style={styles.jobDesc} numberOfLines={viewMode === 'grid' ? 2 : 3}>
+                {job.description}
+              </Text>
+              <View style={styles.jobCardFooter}>
+                <Text style={styles.jobPrice}>{job.price?.toLocaleString('vi-VN')}</Text>
+                <Text style={styles.jobMeta}>
+                  {job.assignedWorkers}/{job.requiredWorkers} người
+                </Text>
+              </View>
+              {job.scheduledAt ? (
+                <Text style={styles.jobScheduleText}>Lịch: {formatDateTime(job.scheduledAt)}</Text>
+              ) : null}
+              {(job.skillTags?.length ?? 0) > 0 && (
+                <View style={styles.skillRow}>
+                  {(job.skillTags ?? []).slice(0, viewMode === 'grid' ? 2 : 4).map((tag, i) => (
+                    <View key={i} style={styles.skillTag}>
+                      <Text style={styles.skillTagText} numberOfLines={1}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.applyBtn,
+                !canApply(job) && !canCancelApply(job._id) && styles.applyBtnDisabled,
+              ]}
+              activeOpacity={0.85}
+              disabled={(!canApply(job) && !canCancelApply(job._id)) || applyingJobId === job._id}
+              onPress={() => (canCancelApply(job._id) ? handleCancelApply(job) : confirmApply(job))}
+            >
+              <Text style={[styles.applyBtnText, !canApply(job) && !canCancelApply(job._id) && styles.applyBtnTextDisabled]}>
+                {applyingJobId === job._id
+                  ? 'Đang xử lý...'
+                  : canCancelApply(job._id)
+                    ? 'Hủy ứng tuyển'
+                    : isApplied(job._id)
+                      ? 'Đã được chọn'
+                      : 'Ứng tuyển'}
+              </Text>
+            </TouchableOpacity>
           </TouchableOpacity>
-            ))}
-            {row.length === 1 && <View style={styles.cardSpacer} />}
-          </View>
         )}
       />
 
-      {/* Pagination */}
-      {total > 0 && (
-        <View style={styles.pagination}>
-          <TouchableOpacity
-            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-            onPress={() => goToPage(page - 1)}
-            disabled={page <= 1}
-          >
-            <Text style={[styles.pageBtnText, page <= 1 && styles.pageBtnTextDisabled]}>← Trước</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageInfo}>
-            Trang {page}/{totalPages} ({total} tin)
-          </Text>
-          <TouchableOpacity
-            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-            onPress={() => goToPage(page + 1)}
-            disabled={page >= totalPages}
-          >
-            <Text style={[styles.pageBtnText, page >= totalPages && styles.pageBtnTextDisabled]}>Sau →</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <UserBottomBar navigation={navigation} active="BrowseJobs" />
 
       {/* Filter Modal */}
       <Modal visible={showFilter} transparent animationType="slide">
@@ -566,7 +568,7 @@ export default function BrowseJobsScreen() {
                 <View style={styles.detailHeader}>
                   <Text style={styles.detailTitle}>{selectedJob.title}</Text>
                   <TouchableOpacity onPress={() => setSelectedJob(null)}>
-                    <Text style={styles.closeBtn}>✕</Text>
+                    <Ionicons name="close" size={22} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={styles.detailBody}>
@@ -738,7 +740,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(180,83,9,0.2)',
   },
+  filterBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filterBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.primaryDark },
+  viewModeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  viewModeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#FAFAF9',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  viewModeBtnActive: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: COLORS.primary,
+  },
+  viewModeText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
+  viewModeTextActive: { color: COLORS.primaryDark },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   loadingText: { fontSize: 13, color: COLORS.textMuted },
   btn: { flex: 1, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
@@ -757,28 +778,20 @@ const styles = StyleSheet.create({
   btnOutlineText: { color: COLORS.textMuted, fontWeight: '600', fontSize: 15 },
   scroll: { flex: 1 },
   list: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 90 },
+  scrollContent: { padding: 16, paddingBottom: 150 },
   emptyList: { flexGrow: 1 },
-  cardRow: {
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    marginBottom: CARD_GAP,
-  },
-  cardSpacer: { width: CARD_GAP },
-  jobCardLeft: { marginRight: CARD_GAP },
+  gridRow: { gap: CARD_GAP },
   emptyState: {
     paddingVertical: 72,
     alignItems: 'center',
   },
-  emptyIcon: { fontSize: 48, marginBottom: 16, opacity: 0.6 },
   emptyText: { fontSize: 18, color: COLORS.textMuted, marginBottom: 8, fontWeight: '500' },
   emptyHint: { fontSize: 14, color: COLORS.textMuted, opacity: 0.8 },
   jobCard: {
-    width: CARD_WIDTH,
     backgroundColor: COLORS.card,
     borderRadius: 14,
     padding: 14,
-    minHeight: 160,
+    minHeight: 210,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -786,8 +799,11 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
-
+    marginBottom: CARD_GAP,
   },
+  jobCardGrid: { width: CARD_WIDTH },
+  jobCardList: { width: '100%' },
+  jobCardContent: { flex: 1 },
   jobCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -808,7 +824,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 12,
   },
   applyBtnDisabled: {
     backgroundColor: COLORS.border,
@@ -830,21 +846,7 @@ const styles = StyleSheet.create({
     maxWidth: 80,
   },
   skillTagText: { fontSize: 10, color: COLORS.primaryDark, fontWeight: '600' },
-  pagination: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: COLORS.card,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
-  },
-  pageBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10 },
   pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
-  pageBtnTextDisabled: { color: COLORS.textMuted },
-  pageInfo: { fontSize: 13, color: COLORS.textMuted },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -917,7 +919,6 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.borderLight,
   },
   detailTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, flex: 1 },
-  closeBtn: { fontSize: 22, color: COLORS.textMuted, fontWeight: '600' },
   detailBody: { maxHeight: 400, padding: 22 },
   detailDesc: { fontSize: 15, color: COLORS.textSecondary, lineHeight: 24, marginBottom: 20 },
   detailRow: { marginBottom: 16 },

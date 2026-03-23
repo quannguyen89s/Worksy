@@ -5,6 +5,11 @@ export type RootStackParamList = {
   BrowseJobs: undefined;
   MyJobs: undefined;
   WorkerApplies: undefined;
+  AdminDashboard: undefined;
+  AdminUsers: undefined;
+  AdminJobs: undefined;
+  AdminSettings: undefined;
+  AdminAlerts: undefined;
 };
 
 declare global {

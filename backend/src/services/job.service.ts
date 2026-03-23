@@ -40,8 +40,6 @@ function syncJobStatus(doc: {
   const { requiredWorkers, assignedWorkers } = doc;
   if (assignedWorkers >= requiredWorkers) {
     doc.status = "full";
-  } else if (assignedWorkers > 0) {
-    doc.status = "partial";
   } else {
     doc.status = "open";
   }
@@ -152,7 +150,7 @@ export async function listJobsNearby(
   radiusKm = 10,
 ) {
   const jobs = await jobModel
-    .find({ status: { $in: ["open", "partial", "full"] } })
+    .find({ status: { $in: ["open", "full"] }, isDeleted: { $ne: true } })
     .lean();
   const withDist = jobs
     .map((j) => {
@@ -167,7 +165,7 @@ export async function listJobsNearby(
 
 export async function getJobById(id: string) {
   const job = await jobModel.findById(id).lean();
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
   return job;
 }
 
@@ -199,6 +197,7 @@ export async function createJob(
     assignedWorkers: 0,
     assignedWorkerIds: [],
     status: "pending",
+    isDeleted: false,
   });
   const id = String(job._id);
   const dbName = mongoose.connection.db?.databaseName ?? "?";
@@ -247,11 +246,17 @@ async function markJobDone(jobId: string, source: CompletionSource, customerId?:
 }
 
 export async function listMyJobs(customerId: string) {
-  return jobModel.find({ createdBy: customerId }).sort({ createdAt: -1 }).lean();
+  return jobModel
+    .find({ createdBy: customerId, isDeleted: { $ne: true } })
+    .sort({ createdAt: -1 })
+    .lean();
 }
 
 export async function listPendingJobs() {
-  return jobModel.find({ status: "pending" }).sort({ createdAt: -1 }).lean();
+  return jobModel
+    .find({ status: "pending", isDeleted: { $ne: true } })
+    .sort({ createdAt: -1 })
+    .lean();
 }
 
 export async function listRecommendedJobs(
@@ -266,7 +271,7 @@ export async function listRecommendedJobs(
   const wLng = lng ?? worker.location?.lng ?? 0;
   const skills = worker.skills ?? [];
   const jobs = await jobModel
-    .find({ status: { $in: ["open", "partial"] } })
+    .find({ status: "open", isDeleted: { $ne: true } })
     .lean();
   const scored = jobs.map((j) => {
     const jl = jobPoint(j);
@@ -285,7 +290,7 @@ export async function listRecommendedJobs(
 
 export async function listApplicantsRanked(jobId: string, customerId: string) {
   const job = await jobModel.findById(jobId).lean();
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
   if (String(job.createdBy) !== customerId) {
     throw new AppError("Forbidden", 403);
   }
@@ -332,7 +337,7 @@ export async function selectWorkers(
   session.startTransaction();
   try {
     const job = await jobModel.findById(jobId).session(session);
-    if (!job) throw new AppError("Job not found", 404);
+    if (!job || job.isDeleted) throw new AppError("Job not found", 404);
     if (String(job.createdBy) !== customerId) {
       throw new AppError("Forbidden", 403);
     }
@@ -419,7 +424,7 @@ export async function selectWorkers(
 
 export async function approveJob(jobId: string) {
   const job = await jobModel.findById(jobId);
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
   if (job.status !== "pending") {
     throw new AppError("Chỉ tin pending mới được duyệt", 400);
   }
@@ -445,7 +450,7 @@ export async function updateJob(
   },
 ) {
   const job = await jobModel.findById(jobId);
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
   if (String(job.createdBy) !== customerId) {
     throw new AppError("Forbidden", 403);
   }
@@ -483,7 +488,7 @@ export async function updateJob(
 
 export async function deleteJob(jobId: string, customerId: string) {
   const job = await jobModel.findById(jobId);
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
   if (String(job.createdBy) !== customerId) {
     throw new AppError("Forbidden", 403);
   }
@@ -496,13 +501,30 @@ export async function deleteJob(jobId: string, customerId: string) {
       400,
     );
   }
-  await applicationModel.deleteMany({ jobId });
-  await job.deleteOne();
+  job.isDeleted = true;
+  await job.save();
   return { deleted: true, id: jobId };
 }
 
 export async function completeJob(jobId: string, customerId: string) {
+  const job = await jobModel.findById(jobId);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
+  if (String(job.createdBy) !== customerId) {
+    throw new AppError("Forbidden", 403);
+  }
+  if (job.status === "done") {
+    return job.toObject();
+  }
+  job.status = "done";
+  await job.save();
+  const workerIds = job.assignedWorkerIds.map(String);
+  if (workerIds.length > 0) {
+    await userModel.updateMany(
+      { _id: { $in: workerIds } },
+      { $inc: { completedJobs: 1 } },
+    );
   return markJobDone(jobId, "manual", customerId);
+}
 }
 
 export async function completeOverdueJobs() {

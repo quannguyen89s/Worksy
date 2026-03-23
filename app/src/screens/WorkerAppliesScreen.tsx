@@ -7,6 +7,9 @@ import * as SecureStore from 'expo-secure-store';
 import type { RootStackParamList } from '@/navigation/types';
 import * as jobApi from '@/api/jobApi';
 import { COLORS } from '@/theme/colors';
+import UserBottomBar from '@/components/navigation/UserBottomBar';
+import UserHeader from '@/components/navigation/UserHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ApplyFilter = 'all' | 'pending' | 'accepted' | 'rejected' | 'done';
 
@@ -20,6 +23,7 @@ const FILTERS: { id: ApplyFilter; label: string }[] = [
 
 export default function WorkerAppliesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [accessToken, setAccessToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -94,15 +98,12 @@ export default function WorkerAppliesScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Việc đã ứng tuyển</Text>
-          <Text style={styles.subtitle}>Lịch sử và trạng thái công việc</Text>
-        </View>
-      </View>
+      <UserHeader
+        title="Việc đã ứng tuyển"
+        subtitle="Lịch sử và trạng thái công việc"
+        leftIcon="menu"
+        onLeftPress={() => navigation.navigate('Home')}
+      />
 
       <View style={styles.searchCard}>
         <TextInput
@@ -125,7 +126,7 @@ export default function WorkerAppliesScreen() {
         </ScrollView>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 10) + 86 }]}>
         {loading ? (
           <ActivityIndicator color={COLORS.primary} />
         ) : filteredRows.length === 0 ? (
@@ -149,6 +150,7 @@ export default function WorkerAppliesScreen() {
           })
         )}
       </ScrollView>
+      <UserBottomBar navigation={navigation} active="WorkerApplies" />
     </SafeAreaView>
   );
 }
