@@ -40,8 +40,8 @@ const jobSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["open", "partial", "full", "done"],
-      default: "open",
+      enum: ["pending", "open", "partial", "full", "done"],
+      default: "pending",
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
