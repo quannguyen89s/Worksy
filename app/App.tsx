@@ -9,6 +9,9 @@ import ForgotPasswordScreen from '@/components/authScreens/ForgotPasswordScreen'
 import VerifyOTPScreen from '@/components/authScreens/VerifyOTPScreen';
 import ResetPasswordScreen from '@/components/authScreens/ResetPasswordScreen';
 import HomeScreen from '@/screens/HomeScreen';
+import ProfileScreen from '@/components/ProfileScreens/ProfileScreen';
+import EditProfileScreen from '@/components/ProfileScreens/EditProfileScreen';
+import ChangePasswordScreen from '@/components/ProfileScreens/ChangePasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +29,9 @@ export default function App() {
           <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
         </Stack.Navigator>
       </NavigationContainer>
       <ToastProvider />
