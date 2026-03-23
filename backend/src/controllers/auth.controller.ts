@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { loginService, registerService, verifyEmailService, resendVerifyEmailService, forgotPasswordService, verifyForgotPasswordOTPService, resetPasswordService, logoutService } from "../services/auth.service";
+import { loginService, registerService, verifyEmailService, resendVerifyEmailService, forgotPasswordService, verifyForgotPasswordOTPService, resetPasswordService, logoutService, refreshTokenService } from "../services/auth.service";
 import { getGoogleAuthURL, googleCallbackService } from "../services/google.service";
 import { LoginRequestBody, RegisterRequestBody, VerifyEmailRequestBody, ForgotPasswordRequestBody, VerifyForgotPasswordOTPRequestBody, ResetPasswordRequestBody } from "../models/request/user.request";
 import { ParamsDictionary } from "express-serve-static-core";
@@ -166,6 +166,19 @@ export const resetPasswordController = async (req: Request<ParamsDictionary, any
         const { email, otp, password } = req.body;
         const result = await resetPasswordService(email, otp, password);
         return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return handleError(error, res);
+    }
+}
+
+export const refreshTokenController = async (req: Request, res: Response) => {
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: USER_MESSAGE.REFRESH_TOKEN_REQUIRED });
+        }
+        const result = await refreshTokenService(refreshToken);
+        return res.status(HTTP_STATUS.OK).json({ message: USER_MESSAGE.REFRESH_TOKEN_SUCCESSFUL, ...result });
     } catch (error) {
         return handleError(error, res);
     }

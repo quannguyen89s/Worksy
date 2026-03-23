@@ -148,3 +148,25 @@ export const logoutService = async (userId: string) => {
     await userModel.updateOne({ _id: userId }, { refreshToken: "" });
     return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
 }
+
+export const refreshTokenService = async (refreshToken: string) => {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET_REFRESH_TOKEN!) as { _id: string; role: string };
+
+    const user = await userModel.findById(decoded._id);
+    if (!user) {
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+    if (user.refreshToken !== refreshToken) {
+        throw new AppError(USER_MESSAGE.INVALID_REFRESH_TOKEN, HTTP_STATUS.UNAUTHORIZED);
+    }
+
+    const [newAccessToken, newRefreshToken] = await Promise.all([
+        signAccessToken(user._id.toString(), user.role),
+        signRefreshToken(user._id.toString(), user.role),
+    ]);
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+}
