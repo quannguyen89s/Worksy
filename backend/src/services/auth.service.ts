@@ -3,86 +3,56 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
-import { sendVerifyEmail } from "./email.service";
+import HTTP_STATUS from "../constants/httpStatus";
+import { sendForgotPasswordEmail } from "./email.service";
+import { signAccessToken, signRefreshToken } from "../utils/jwt";
+import { AppError } from "../utils/AppError";
 
-const signAccessToken = (userId: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
-}
-
-const signRefreshToken = (userId: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_REFRESH_TOKEN!, { expiresIn: "7d" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
-}
-
-const signEmailVerifyToken = (userId: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN!, { expiresIn: "1d" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
+const generateOTP = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export const loginService = async (email: string, password: string) => {
-
-    const user = await userModel.findOne({ email }).select("+password");
+    // select('+password') required because password has select:false in schema
+    const user = await userModel.findOne({ email }).select('+password');
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+    if (!user.password) {
+        throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        return { message: USER_MESSAGE.INVALID_PASSWORD };
+        throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
     }
     if (!user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_NOT_VERIFIED };
+        throw new AppError(USER_MESSAGE.EMAIL_NOT_VERIFIED, HTTP_STATUS.FORBIDDEN);
     }
-    const accessToken = jwt.sign(
-        {
-            _id: user._id,
-            sub: String(user._id),
-            role: user.role,
-            name: user.name,
-        },
-        process.env.JWT_SECRET_ACCESS_TOKEN!,
-        { expiresIn: "7d" },
-    );
-    const refreshToken = jwt.sign(
-        { _id: user._id },
-        process.env.JWT_SECRET_REFRESH_TOKEN!,
-        { expiresIn: "7d" }
-    );
-    user.refreshToken = refreshToken;
-    await user.save();
+    const [accessToken, refreshToken] = await Promise.all([
+        signAccessToken(user._id.toString(), user.role),
+        signRefreshToken(user._id.toString(), user.role),
+    ]);
+    // Use updateOne to avoid re-validating password (select:false)
+    await userModel.updateOne({ _id: user._id }, { refreshToken });
 
     return { message: USER_MESSAGE.LOGIN_SUCCESSFUL, accessToken, refreshToken };
 }
 
 export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {
-    const user = await userModel.findOne({ email });
-    if (user) {
-        return { message: USER_MESSAGE.USER_ALREADY_EXISTS };
+    const existing = await userModel.findOne({ email });
+    if (existing) {
+        throw new AppError(USER_MESSAGE.USER_ALREADY_EXISTS, HTTP_STATUS.UNPROCESSABLE_ENTITY);
     }
     if (password !== confirm_password) {
-        return { message: USER_MESSAGE.PASSWORD_NOT_MATCH };
+        throw new AppError(USER_MESSAGE.PASSWORD_NOT_MATCH, HTTP_STATUS.BAD_REQUEST);
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user_id = new ObjectId()
+    const user_id = new ObjectId();
 
-    const emailVerifyToken = await signEmailVerifyToken(user_id.toString());
-    await userModel.create({ _id: user_id, name, email, password: hashedPassword, emailVerifyToken });
+    // isVerified: true so user can login immediately without email verification
+    await userModel.create({ _id: user_id, name, email, password: hashedPassword, isVerified: true });
 
-    await sendVerifyEmail(email, emailVerifyToken);
-
-    return { message: USER_MESSAGE.REGISTER_SUCCESSFUL, emailVerifyToken };
+    return { message: USER_MESSAGE.REGISTER_SUCCESSFUL };
 }
 
 export const verifyEmailService = async (emailVerifyToken: string) => {
@@ -90,13 +60,10 @@ export const verifyEmailService = async (emailVerifyToken: string) => {
 
     const user = await userModel.findById(decoded._id);
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_ALREADY_VERIFIED };
-    }
-    if (user.emailVerifyToken !== emailVerifyToken) {
-        return { message: USER_MESSAGE.INVALID_EMAIL_VERIFY_TOKEN };
+        throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
     }
 
     await userModel.updateOne({ _id: decoded._id }, { isVerified: true, emailVerifyToken: "" });
@@ -107,16 +74,70 @@ export const verifyEmailService = async (emailVerifyToken: string) => {
 export const resendVerifyEmailService = async (email: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_ALREADY_VERIFIED };
+        throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
+    }
+    return { message: USER_MESSAGE.RESEND_VERIFY_EMAIL_SUCCESSFUL };
+}
+
+export const forgotPasswordService = async (email: string) => {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
-    const emailVerifyToken = await signEmailVerifyToken(user._id.toString());
-    await userModel.updateOne({ _id: user._id }, { emailVerifyToken });
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    await sendVerifyEmail(email, emailVerifyToken);
+    await userModel.updateOne(
+        { _id: user._id },
+        { forgotPasswordOTP: otp, forgotPasswordOTPExpiry: otpExpiry }
+    );
 
-    return { message: USER_MESSAGE.RESEND_VERIFY_EMAIL_SUCCESSFUL, emailVerifyToken };
+    await sendForgotPasswordEmail(email, otp);
+
+    return { message: USER_MESSAGE.FORGOT_PASSWORD_EMAIL_SENT };
+}
+
+export const verifyForgotPasswordOTPService = async (email: string, otp: string) => {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+    if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
+        throw new AppError(USER_MESSAGE.OTP_EXPIRED, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (user.forgotPasswordOTP !== otp) {
+        throw new AppError(USER_MESSAGE.INVALID_OTP, HTTP_STATUS.BAD_REQUEST);
+    }
+
+    return { message: USER_MESSAGE.VERIFY_OTP_SUCCESSFUL };
+}
+
+export const resetPasswordService = async (email: string, otp: string, password: string) => {
+    const user = await userModel.findOne({ email });
+    if (!user) {
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+    if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
+        throw new AppError(USER_MESSAGE.OTP_EXPIRED, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (user.forgotPasswordOTP !== otp) {
+        throw new AppError(USER_MESSAGE.INVALID_OTP, HTTP_STATUS.BAD_REQUEST);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await userModel.updateOne(
+        { _id: user._id },
+        { password: hashedPassword, forgotPasswordOTP: "", forgotPasswordOTPExpiry: null }
+    );
+
+    return { message: USER_MESSAGE.RESET_PASSWORD_SUCCESSFUL };
+}
+
+export const logoutService = async (userId: string) => {
+    await userModel.updateOne({ _id: userId }, { refreshToken: "" });
+    return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
 }

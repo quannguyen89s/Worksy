@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { Role, UserVerifyStatus } from "../constants/enum";
+import { Role } from "../constants/enum";
 
 const userSchema = new mongoose.Schema(
   {
@@ -46,17 +46,25 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    googleId: {
+      type: String,
+      default: "",
+    },
     refreshToken: {
       type: String,
       default: "",
     },
     isVerified: {
       type: Boolean,
-      default: UserVerifyStatus.Unverified,
+      default: false,
     },
-    forgotPasswordToken: {
+    forgotPasswordOTP: {
       type: String,
       default: "",
+    },
+    forgotPasswordOTPExpiry: {
+      type: Date,
+      default: null,
     },
     emailVerifyToken: {
       type: String,

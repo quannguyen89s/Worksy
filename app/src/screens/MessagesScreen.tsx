@@ -16,7 +16,7 @@ import type { Socket } from 'socket.io-client';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import { getConversations } from '../services/chat.service';
-import { getStoredUser } from '../services/auth.service';
+import { getStoredUser } from '../services/authService';
 import { connectSocket } from '../services/socket';
 import { Conversation, RootStackParamList, User } from '../types';
 
@@ -61,9 +61,9 @@ export default function MessagesScreen({ navigation }: Props) {
       setFiltered(convs);
       setMe(user);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } }; message?: string };
+      const err = e as { response?: { status?: number; data?: { message?: string } }; message?: string; code?: string };
       const msg = err?.response?.data?.message ?? err?.message ?? 'Lỗi tải dữ liệu';
-      console.error('[MessagesScreen] load error:', JSON.stringify(e));
+      console.error('[MessagesScreen] load error:', msg, '| code:', err?.code, '| status:', err?.response?.status);
       setError(msg);
     }
   }, []);
@@ -213,20 +213,20 @@ export default function MessagesScreen({ navigation }: Props) {
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="search" size={22} color="#9CA3AF" />
+            <Ionicons name="search" size={22} color="#6A5A4A" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="add" size={24} color="#9CA3AF" />
+            <Ionicons name="add" size={24} color="#6A5A4A" />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.searchWrapper}>
-        <Ionicons name="search" size={16} color="#6B7280" style={styles.searchIcon} />
+        <Ionicons name="search" size={16} color="#A0927E" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search conversations..."
-          placeholderTextColor="#A38A56"
+          placeholder="Tìm kiếm cuộc trò chuyện..."
+          placeholderTextColor="#B0A090"
           value={query}
           onChangeText={setQuery}
         />
@@ -234,21 +234,21 @@ export default function MessagesScreen({ navigation }: Props) {
 
       {error ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="warning-outline" size={40} color="#F87171" />
+          <Ionicons name="warning-outline" size={40} color="#C87941" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => void load()}>
             <Text style={styles.retryText}>Thử lại</Text>
           </TouchableOpacity>
         </View>
       ) : loading ? (
-        <ActivityIndicator color="#C98A00" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#C87941" style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C98A00" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C87941" />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -262,35 +262,70 @@ export default function MessagesScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#111827' },
+  safe: { flex: 1, backgroundColor: '#F2EAE0' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 10,
+    paddingBottom: 14,
+    backgroundColor: '#F2EAE0',
   },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#F9FAFB' },
-  headerActions: { flexDirection: 'row', gap: 4 },
-  iconBtn: { padding: 8 },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1A0F0A',
+    letterSpacing: -0.5,
+  },
+  headerActions: { flexDirection: 'row', gap: 2 },
+  iconBtn: {
+    padding: 8,
+    backgroundColor: '#E8DDD2',
+    borderRadius: 12,
+    marginLeft: 6,
+  },
+
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F2937',
-    borderRadius: 14,
+    backgroundColor: '#EAE2D8',
+    borderRadius: 16,
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#DDD5C8',
+    shadowColor: '#8B6F5E',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
   },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, height: 42, color: '#F9FAFB', fontSize: 14 },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    color: '#1A0F0A',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#374151',
+    paddingVertical: 14,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    backgroundColor: '#FBF7F3',
+    borderRadius: 18,
+    shadowColor: '#8B6F5E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   itemBody: { flex: 1, marginLeft: 14 },
   itemTop: {
@@ -298,27 +333,63 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  itemName: { fontSize: 15, fontWeight: '600', color: '#F9FAFB', flex: 1, marginRight: 8 },
-  itemTime: { fontSize: 12, color: '#6B7280' },
-  itemSub: { marginTop: 2 },
-  rolePill: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  itemName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1A0F0A',
+    flex: 1,
+    marginRight: 8,
+  },
+  itemTime: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8B7060',
+  },
+  itemSub: { marginTop: 3 },
+  rolePill: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7A5C42',
+    backgroundColor: '#EDE3D8',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 3,
+    overflow: 'hidden',
+  },
   itemBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 3,
+    marginTop: 5,
   },
-  itemPreview: { fontSize: 13, color: '#9CA3AF', flex: 1, marginRight: 8 },
-  itemPreviewBold: { color: '#F9FAFB', fontWeight: '500' },
+  itemPreview: {
+    fontSize: 13,
+    color: '#6B5040',
+    flex: 1,
+    marginRight: 8,
+    lineHeight: 18,
+  },
+  itemPreviewBold: {
+    color: '#1A0F0A',
+    fontWeight: '600',
+  },
+
   emptyContainer: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
-  empty: { textAlign: 'center', color: '#9CA3AF', fontSize: 14, marginTop: 12 },
-  errorText: { color: '#F87171', fontSize: 14, textAlign: 'center', marginTop: 12 },
+  empty: { textAlign: 'center', color: '#7A6050', fontSize: 14, marginTop: 12, fontWeight: '500' },
+  errorText: { color: '#B85C2A', fontSize: 14, textAlign: 'center', marginTop: 12, fontWeight: '500' },
   retryBtn: {
     marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    backgroundColor: '#C98A00',
-    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    backgroundColor: '#C87941',
+    borderRadius: 24,
+    shadowColor: '#C87941',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  retryText: { color: '#fff', fontWeight: '600' },
+  retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });

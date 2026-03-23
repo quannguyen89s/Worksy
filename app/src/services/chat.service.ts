@@ -3,7 +3,7 @@ import { Conversation, Message } from '../types';
 
 export async function getConversations(): Promise<Conversation[]> {
   const res = await api.get<{ success: boolean; conversations: Conversation[] }>('/chat/conversations');
-  return res.data.conversations;
+  return res.data.conversations ?? [];
 }
 
 export async function createConversation(recipientId: string, jobId?: string): Promise<Conversation> {

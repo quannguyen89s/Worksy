@@ -14,17 +14,17 @@ import { useNavigation } from '@react-navigation/native';
 import type { Socket } from 'socket.io-client';
 import { getNotifications, markAllRead, markRead } from '../services/notification.service';
 import { getConversations } from '../services/chat.service';
-import { getStoredUser } from '../services/auth.service';
+import { getStoredUser } from '../services/authService';
 import { connectSocket } from '../services/socket';
 import { Notification } from '../types';
 
 const ICON_MAP: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  new_message: { name: 'chatbubble-ellipses', color: '#C98A00' },
-  job_application: { name: 'briefcase', color: '#818CF8' },
-  application_accepted: { name: 'checkmark-circle', color: '#34D399' },
-  application_rejected: { name: 'close-circle', color: '#F87171' },
-  job_assigned: { name: 'person-add', color: '#60A5FA' },
-  job_completed: { name: 'trophy', color: '#FBBF24' },
+  new_message: { name: 'chatbubble-ellipses', color: '#C87941' },
+  job_application: { name: 'briefcase', color: '#7B6FAA' },
+  application_accepted: { name: 'checkmark-circle', color: '#5A9E7A' },
+  application_rejected: { name: 'close-circle', color: '#C05B5B' },
+  job_assigned: { name: 'person-add', color: '#5A87C0' },
+  job_completed: { name: 'trophy', color: '#C9A040' },
 };
 
 function formatTime(iso: string): string {
@@ -175,7 +175,7 @@ export default function NotificationsScreen() {
           <View style={styles.itemTop}>
             <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
             {isClickable && (
-              <Ionicons name="chevron-forward" size={14} color="#6B7280" style={styles.chevron} />
+              <Ionicons name="chevron-forward" size={14} color="#B0A090" style={styles.chevron} />
             )}
           </View>
           <Text style={styles.itemBody} numberOfLines={2}>{item.body}</Text>
@@ -195,13 +195,13 @@ export default function NotificationsScreen() {
             <Text style={styles.readAll}>Đọc tất cả</Text>
           </TouchableOpacity>
         )}
-      </View>
+        </View>
 
       {loading ? (
-        <ActivityIndicator color="#C98A00" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#C87941" style={{ marginTop: 40 }} />
       ) : notifications.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={56} color="#6B7280" />
+          <Ionicons name="notifications-off-outline" size={56} color="#B0A090" />
           <Text style={styles.empty}>Chưa có thông báo nào</Text>
         </View>
       ) : (
@@ -217,7 +217,7 @@ export default function NotificationsScreen() {
             </>
           )}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C98A00" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C87941" />
           }
         />
       )}
@@ -226,37 +226,69 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#111827' },
+  safe: { flex: 1, backgroundColor: '#F2EAE0' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingTop: 10,
+    paddingBottom: 14,
+    backgroundColor: '#F2EAE0',
   },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#F9FAFB' },
-  readAll: { fontSize: 14, color: '#C98A00', fontWeight: '600' },
-  groupLabel: {
-    fontSize: 12,
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1A0F0A',
+    letterSpacing: -0.5,
+  },
+  readAll: {
+    fontSize: 13,
+    color: '#C87941',
     fontWeight: '700',
-    color: '#6B7280',
-    letterSpacing: 0.8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#F0E4D4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
+
+  groupLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7A5C42',
+    letterSpacing: 1.2,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
+
   item: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#374151',
+    marginHorizontal: 12,
+    marginVertical: 4,
+    backgroundColor: '#FBF7F3',
+    borderRadius: 18,
+    shadowColor: '#8B6F5E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  itemUnread: { backgroundColor: '#1F2937' },
+  itemUnread: {
+    backgroundColor: '#FFF8F0',
+    borderLeftWidth: 3,
+    borderLeftColor: '#C87941',
+  },
+
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -264,19 +296,42 @@ const styles = StyleSheet.create({
   },
   itemContent: { flex: 1 },
   itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  itemTitle: { fontSize: 14, fontWeight: '600', color: '#F9FAFB', flex: 1, marginBottom: 3 },
+  itemTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A0F0A',
+    flex: 1,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
   chevron: { marginLeft: 4 },
-  itemBody: { fontSize: 13, color: '#9CA3AF', lineHeight: 18 },
-  itemTime: { fontSize: 12, color: '#6B7280', marginTop: 5 },
-  dot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: '#C98A00',
+  itemBody: {
+    fontSize: 13,
+    color: '#4A3020',
+    lineHeight: 19,
+    fontWeight: '400',
+  },
+  itemTime: {
+    fontSize: 11,
+    color: '#8B7060',
     marginTop: 6,
+    fontWeight: '600',
+  },
+
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#C87941',
+    marginTop: 4,
     marginLeft: 8,
     flexShrink: 0,
+    shadowColor: '#C87941',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
   },
+
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  empty: { color: '#9CA3AF', fontSize: 14 },
+  empty: { color: '#7A6050', fontSize: 14, fontWeight: '600' },
 });

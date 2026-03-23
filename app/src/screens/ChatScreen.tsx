@@ -20,7 +20,7 @@ import type { Socket } from 'socket.io-client';
 import MessageBubble from '../components/MessageBubble';
 import Avatar from '../components/Avatar';
 import { getMessages, markRead, sendImageMessage } from '../services/chat.service';
-import { getStoredUser } from '../services/auth.service';
+import { getStoredUser } from '../services/authService';
 import { connectSocket } from '../services/socket';
 import { Message, RootStackParamList, User } from '../types';
 
