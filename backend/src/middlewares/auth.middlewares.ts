@@ -1,11 +1,47 @@
 import { NextFunction, Request, Response } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
 import { checkSchema } from "express-validator";
 import userModel from "../models/user.model";
 import { validate } from "../utils/validation";
 import USER_MESSAGE from "../constants/userMessage";
+import jwt from "jsonwebtoken";
 
-const loginValidator = checkSchema({
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (!token) {
+        return res.status(401).json({ message: USER_MESSAGE.TOKEN_REQUIRED });
+    }
+    jwt.verify(token, process.env.JWT_SECRET_ACCESS_TOKEN!, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: USER_MESSAGE.INVALID_TOKEN });
+        }
+        req.user = user as { _id: string; role: string };
+        next();
+    });
+}
+
+export const authorizeToken = (...roles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const authHeader = req.headers["authorization"];
+        const token = authHeader && authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ message: USER_MESSAGE.TOKEN_REQUIRED });
+        }
+        jwt.verify(token, process.env.JWT_SECRET_ACCESS_TOKEN!, (err, user) => {
+            if (err) {
+                return res.status(403).json({ message: USER_MESSAGE.INVALID_TOKEN });
+            }
+            const decoded = user as { _id: string; role: string };
+            if (!roles.includes(decoded.role)) {
+                return res.status(403).json({ message: USER_MESSAGE.UNAUTHORIZED });
+            }
+            req.user = decoded;
+            next();
+        });
+    };
+}
+
+export const loginValidator = validate(checkSchema({
     email: {
         notEmpty: {
             errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
@@ -28,9 +64,9 @@ const loginValidator = checkSchema({
             errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
         },
     },
-}, ["body"]);
+}, ["body"]));
 
-const registerValidator = checkSchema({
+export const registerValidator = validate(checkSchema({
     name: {
         notEmpty: {
             errorMessage: USER_MESSAGE.NAME_REQUIRED,
@@ -40,15 +76,6 @@ const registerValidator = checkSchema({
             errorMessage: USER_MESSAGE.NAME_LENGTH,
         },
         trim: true,
-        custom: {
-            options: async (value: string) => {
-                const user = await userModel.findOne({ name: value });
-                if (user) {
-                    throw new Error(USER_MESSAGE.NAME_ALREADY_EXISTS);
-                }
-                return true;
-            },
-        },
     },
     email: {
         notEmpty: {
@@ -102,12 +129,10 @@ const registerValidator = checkSchema({
             },
         },
     },
-}, ["body"]);
+}, ["body"]));
 
-export const loginMiddleware = validate(loginValidator);
-export const registerMiddleware = validate(registerValidator);
 
-const emailVerifyValidator = checkSchema({
+export const emailVerifyValidator = validate(checkSchema({
     emailVerifyToken: {
         notEmpty: {
             errorMessage: USER_MESSAGE.EMAIL_VERIFY_TOKEN_REQUIRED,
@@ -117,11 +142,10 @@ const emailVerifyValidator = checkSchema({
         },
         trim: true,
     },
-}, ["body"]);
+}, ["body"]));
 
-export const verifyEmailMiddleware = validate(emailVerifyValidator);
 
-const resendVerifyEmailValidator = checkSchema({
+export const resendVerifyEmailValidator = validate(checkSchema({
     email: {
         notEmpty: {
             errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
@@ -131,11 +155,10 @@ const resendVerifyEmailValidator = checkSchema({
         },
         trim: true,
     },
-}, ["body"]);
+}, ["body"]));
 
-export const resendVerifyEmailMiddleware = validate(resendVerifyEmailValidator);
 
-const forgotPasswordValidator = checkSchema({
+export const forgotPasswordValidator = validate(checkSchema({
     email: {
         notEmpty: {
             errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
@@ -145,11 +168,10 @@ const forgotPasswordValidator = checkSchema({
         },
         trim: true,
     },
-}, ["body"]);
+}, ["body"]));
 
-export const forgotPasswordMiddleware = validate(forgotPasswordValidator);
 
-const verifyForgotPasswordTokenValidator = checkSchema({
+export const verifyForgotPasswordTokenValidator = validate(checkSchema({
     forgotPasswordToken: {
         notEmpty: {
             errorMessage: USER_MESSAGE.FORGOT_PASSWORD_TOKEN_REQUIRED,
@@ -159,7 +181,5 @@ const verifyForgotPasswordTokenValidator = checkSchema({
         },
         trim: true,
     },
-}, ["body"]);
+}, ["body"]));
 
-export const verifyForgotPasswordTokenMiddleware = validate(verifyForgotPasswordTokenValidator);
-

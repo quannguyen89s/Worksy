@@ -16,7 +16,8 @@ export const USER_MESSAGE = {
     NAME_ALREADY_EXISTS: "Name already exists",
     EMAIL_VERIFY_TOKEN_REQUIRED: "Email verify token is required",
     EMAIL_VERIFY_TOKEN_MUST_BE_STRING: "Email verify token must be a string",
-
+    TOKEN_REQUIRED: "Token is required",
+    INVALID_TOKEN: "Invalid token",
     // Auth
     LOGIN_SUCCESSFUL: "Login successful",
     REGISTER_SUCCESSFUL: "Register successful",
@@ -39,6 +40,7 @@ export const USER_MESSAGE = {
     VERIFY_FORGOT_PASSWORD_TOKEN_SUCCESSFUL: "Verify forgot password token successfully",
 
     // General
+    UNAUTHORIZED: "You do not have permission to access this resource",
     INTERNAL_SERVER_ERROR: "Internal server error",
 } as const
 

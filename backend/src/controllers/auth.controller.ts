@@ -49,114 +49,27 @@ export const resendVerifyEmailController = async (req: Request, res: Response) =
     }
 }
 
-const verifyPageTemplate = (type: "success" | "error", title: string, message: string) => `
-<!DOCTYPE html>
+// Template đơn giản cho trang verify email qua link
+const verifyPageTemplate = (type: "success" | "error", title: string, message: string) => {
+    const icon = type === "success" ? "✅" : "❌";
+    return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title} - Worksy</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
-        }
-        .card {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 48px;
-            max-width: 480px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-            animation: fadeInUp 0.5s ease-out;
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .icon-circle {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px;
-            font-size: 36px;
-        }
-        .icon-success {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-        }
-        .icon-error {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        .brand {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 3px;
-            color: #2B4162;
-            margin-bottom: 24px;
-        }
-        h1 {
-            color: #1a1a2e;
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-        p {
-            color: #6b7280;
-            font-size: 15px;
-            line-height: 1.6;
-            margin-bottom: 32px;
-        }
-        .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #2B4162, #385F80);
-            color: #ffffff;
-            padding: 12px 36px;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 14px rgba(43,65,98,0.3);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(43,65,98,0.4);
-        }
-        .footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            color: #d1d5db;
-            font-size: 11px;
-        }
-    </style>
 </head>
-<body>
-    <div class="card">
-        <div class="brand">WORKSY</div>
-        <div class="icon-circle icon-${type}">
-            ${type === "success" ? "&#10003;" : "&#10007;"}
-        </div>
-        <h1>${title}</h1>
-        <p>${message}</p>
-        <a href="${process.env.CLIENT_URL || "/"}" class="btn">Go to Homepage</a>
-        <div class="footer">&copy; 2026 Worksy. All rights reserved.</div>
+<body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5;">
+    <div style="background: #fff; padding: 40px; max-width: 450px; width: 90%; text-align: center; border: 1px solid #ddd; border-radius: 8px;">
+        <h2 style="color: #2B4162; margin-bottom: 20px;">Worksy</h2>
+        <p style="font-size: 32px; margin-bottom: 16px;">${icon}</p>
+        <h3 style="margin-bottom: 12px;">${title}</h3>
+        <p style="color: #666; margin-bottom: 24px;">${message}</p>
+        <p style="color: #ccc; font-size: 11px; margin-top: 24px;">&copy; 2026 Worksy. All rights reserved.</p>
     </div>
 </body>
-</html>
-`;
+</html>`;
+};
 
 export const verifyEmailByLinkController = async (req: Request, res: Response) => {
     try {
@@ -222,134 +135,50 @@ export const verifyForgotPasswordByLinkController = async (req: Request, res: Re
 
 const getResetActionContent = (type: "success" | "error" | "expired", token: string): string => {
     if (type === "success") {
-        const newPasswordUrl = (process.env.CLIENT_URL || "") + "/auth/new-password?token=" + token;
-        return '<a href="' + newPasswordUrl + '" class="btn">Create New Password</a>';
+        return "";
     }
     if (type === "expired") {
-        return '<div class="resend-form">'
-            + '<input type="email" id="resendEmail" placeholder="Enter your email address" />'
-            + '<button class="btn" onclick="resendForgotPassword()" id="resendBtn">Resend Reset Link</button>'
-            + '<div id="resultMessage" class="result-message"></div>'
+        return '<div style="margin-top:8px;">'
+            + '<input type="email" id="resendEmail" placeholder="Enter your email" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px;margin-bottom:12px;" />'
+            + '<button onclick="resendForgotPassword()" id="resendBtn" style="background:#2B4162;color:#fff;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;">Resend Reset Link</button>'
+            + '<div id="resultMsg" style="margin-top:12px;padding:8px;border-radius:4px;font-size:13px;"></div>'
             + '</div>'
             + '<script>'
-            + 'async function resendForgotPassword() {'
-            + '  var email = document.getElementById("resendEmail").value;'
-            + '  var btn = document.getElementById("resendBtn");'
-            + '  var msg = document.getElementById("resultMessage");'
-            + '  if (!email) { msg.className = "result-message result-error"; msg.textContent = "Please enter your email address."; return; }'
-            + '  btn.textContent = "Sending..."; btn.disabled = true;'
-            + '  try {'
-            + '    var res = await fetch("/auth/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email }) });'
-            + '    var data = await res.json();'
-            + '    msg.className = "result-message result-success";'
-            + '    msg.textContent = data.message || "A new reset link has been sent to your email!";'
-            + '  } catch (err) {'
-            + '    msg.className = "result-message result-error";'
-            + '    msg.textContent = "Something went wrong. Please try again.";'
-            + '  }'
-            + '  btn.textContent = "Resend Reset Link"; btn.disabled = false;'
-            + '}'
+            + 'async function resendForgotPassword(){'
+            + 'var e=document.getElementById("resendEmail").value;'
+            + 'var b=document.getElementById("resendBtn");'
+            + 'var m=document.getElementById("resultMsg");'
+            + 'if(!e){m.style.background="#fef2f2";m.style.color="#dc2626";m.textContent="Please enter your email.";return;}'
+            + 'b.textContent="Sending...";b.disabled=true;'
+            + 'try{var r=await fetch("/auth/forgot-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e})});'
+            + 'var d=await r.json();m.style.background="#ecfdf5";m.style.color="#059669";m.textContent=d.message||"Reset link sent!"}'
+            + 'catch(x){m.style.background="#fef2f2";m.style.color="#dc2626";m.textContent="Something went wrong."}'
+            + 'b.textContent="Resend Reset Link";b.disabled=false;}'
             + '</script>';
     }
-    return '<a href="' + (process.env.CLIENT_URL || "/") + '" class="btn">Go to Homepage</a>';
+    return "";
 }
 
 const resetPasswordPageTemplate = (type: "success" | "error" | "expired", title: string, message: string, token: string) => {
-    const iconMap = { success: "&#10003;", expired: "&#9203;", error: "&#10007;" };
+    const iconMap = { success: "✅", expired: "⏰", error: "❌" };
     const actionContent = getResetActionContent(type, token);
 
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title} - Worksy</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #f0f2f5 0%, #e2e8f0 100%);
-        }
-        .card {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 48px;
-            max-width: 480px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-            animation: fadeInUp 0.5s ease-out;
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .icon-circle {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 24px;
-            font-size: 36px;
-        }
-        .icon-success { background: linear-gradient(135deg, #10b981, #059669); color: white; }
-        .icon-error { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
-        .icon-expired { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
-        .brand {
-            font-size: 14px; font-weight: 700; letter-spacing: 3px;
-            color: #2B4162; margin-bottom: 24px;
-        }
-        h1 { color: #1a1a2e; font-size: 24px; font-weight: 600; margin-bottom: 12px; }
-        p { color: #6b7280; font-size: 15px; line-height: 1.6; margin-bottom: 32px; }
-        .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #2B4162, #385F80);
-            color: #ffffff; padding: 12px 36px; text-decoration: none;
-            border-radius: 8px; font-size: 15px; font-weight: 600;
-            letter-spacing: 0.5px; border: none; cursor: pointer;
-            box-shadow: 0 4px 14px rgba(43,65,98,0.3);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(43,65,98,0.4); }
-        .resend-form { margin-top: 8px; }
-        .resend-form input {
-            width: 100%; padding: 12px 16px; border: 2px solid #e5e7eb;
-            border-radius: 8px; font-size: 15px; margin-bottom: 16px;
-            outline: none; transition: border-color 0.2s;
-        }
-        .resend-form input:focus { border-color: #2B4162; }
-        .result-message {
-            margin-top: 12px; padding: 10px 16px; border-radius: 8px;
-            font-size: 14px; display: none;
-        }
-        .result-success { background: #ecfdf5; color: #059669; display: block; }
-        .result-error { background: #fef2f2; color: #dc2626; display: block; }
-        .footer {
-            margin-top: 32px; padding-top: 20px;
-            border-top: 1px solid #e5e7eb; color: #d1d5db; font-size: 11px;
-        }
-    </style>
 </head>
-<body>
-    <div class="card">
-        <div class="brand">WORKSY</div>
-        <div class="icon-circle icon-${type}">
-            ${iconMap[type]}
-        </div>
-        <h1>${title}</h1>
-        <p>${message}</p>
+<body style="font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5;">
+    <div style="background: #fff; padding: 40px; max-width: 450px; width: 90%; text-align: center; border: 1px solid #ddd; border-radius: 8px;">
+        <h2 style="color: #2B4162; margin-bottom: 20px;">Worksy</h2>
+        <p style="font-size: 32px; margin-bottom: 16px;">${iconMap[type]}</p>
+        <h3 style="margin-bottom: 12px;">${title}</h3>
+        <p style="color: #666; margin-bottom: 24px;">${message}</p>
         ${actionContent}
-        <div class="footer">&copy; 2026 Worksy. All rights reserved.</div>
+        <p style="color: #ccc; font-size: 11px; margin-top: 24px;">&copy; 2026 Worksy. All rights reserved.</p>
     </div>
 </body>
-</html>
-`;
+</html>`;
 };
-

@@ -5,18 +5,18 @@ import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
 import { sendVerifyEmail, sendForgotPasswordEmail } from "./email.service";
 
-const signAccessToken = (userId: string) => {
+const signAccessToken = (userId: string, role: string) => {
     return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" }, (err, token) => {
+        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" }, (err, token) => {
             if (err) reject(err);
             resolve(token as string);
         });
     });
 }
 
-const signRefreshToken = (userId: string) => {
+const signRefreshToken = (userId: string, role: string) => {
     return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_REFRESH_TOKEN!, { expiresIn: "7d" }, (err, token) => {
+        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_REFRESH_TOKEN!, { expiresIn: "7d" }, (err, token) => {
             if (err) reject(err);
             resolve(token as string);
         });
@@ -55,8 +55,8 @@ export const loginService = async (email: string, password: string) => {
         return { message: USER_MESSAGE.EMAIL_NOT_VERIFIED };
     }
     const [accessToken, refreshToken] = await Promise.all([
-        signAccessToken(user._id.toString()),
-        signRefreshToken(user._id.toString()),
+        signAccessToken(user._id.toString(), user.role),
+        signRefreshToken(user._id.toString(), user.role),
     ]);
     user.refreshToken = refreshToken;
     await user.save();
