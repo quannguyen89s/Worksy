@@ -5,7 +5,6 @@ import {
   adminListUsersController,
   adminMetaCategoriesController,
   adminOverviewController,
-  adminUpdateJobController,
   adminUpdateUserController,
   adminCreateUserController,
 } from "../controllers/admin.controller";
@@ -21,7 +20,6 @@ adminRouter.get("/users", adminListUsersController);
 adminRouter.post("/users", adminCreateUserController);
 adminRouter.patch("/users/:id", adminUpdateUserController);
 adminRouter.get("/jobs", adminListJobsController);
-adminRouter.patch("/jobs/:id", adminUpdateJobController);
 adminRouter.delete("/jobs/:id", adminDeleteJobController);
 
 export default adminRouter;

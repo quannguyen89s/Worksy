@@ -52,7 +52,7 @@ export async function getOverview() {
     jobsCreatedCurrent,
     jobsCreatedPrev,
     pendingUsers,
-    pendingOpenJobs,
+    pendingJobs,
     activityDoneJobs,
     activityNewUsers,
     unverifiedWorkerCount,
@@ -60,26 +60,30 @@ export async function getOverview() {
     lowRatingReviews,
   ] = await Promise.all([
     userModel.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
-    jobModel.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     jobModel.aggregate([
-      { $match: { status: "done" } },
+      { $match: { isDeleted: { $ne: true } } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]),
+    jobModel.aggregate([
+      { $match: { status: "done", isDeleted: { $ne: true } } },
       { $group: { _id: null, total: { $sum: "$price" } } },
     ]),
     jobModel.aggregate([
-      { $match: { status: "done", updatedAt: { $gte: t7 } } },
+      { $match: { status: "done", updatedAt: { $gte: t7 }, isDeleted: { $ne: true } } },
       { $group: { _id: null, total: { $sum: "$price" } } },
     ]),
     jobModel.aggregate([
       {
         $match: {
           status: "done",
+          isDeleted: { $ne: true },
           updatedAt: { $gte: t14, $lt: t7 },
         },
       },
       { $group: { _id: null, total: { $sum: "$price" } } },
     ]),
-    jobModel.countDocuments({ createdAt: { $gte: t7 } }),
-    jobModel.countDocuments({ createdAt: { $gte: t14, $lt: t7 } }),
+    jobModel.countDocuments({ createdAt: { $gte: t7 }, isDeleted: { $ne: true } }),
+    jobModel.countDocuments({ createdAt: { $gte: t14, $lt: t7 }, isDeleted: { $ne: true } }),
     userModel
       .find({
         isVerified: false,
@@ -90,13 +94,13 @@ export async function getOverview() {
       .select("name role createdAt")
       .lean(),
     jobModel
-      .find({ status: "open" })
+      .find({ status: "pending", isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(3)
       .select("title createdAt")
       .lean(),
     jobModel
-      .find({ status: "done" })
+      .find({ status: "done", isDeleted: { $ne: true } })
       .sort({ updatedAt: -1 })
       .limit(6)
       .select("title price updatedAt _id")
@@ -137,7 +141,7 @@ export async function getOverview() {
       Math.round(
         ((revenueCurrentPeriod - revenuePreviousPeriod) /
           revenuePreviousPeriod) *
-          1000,
+        1000,
       ) / 10;
   }
 
@@ -167,11 +171,11 @@ export async function getOverview() {
       title: u.name,
       subtitle: `Xác minh ${u.role === "worker" ? "Thợ" : "Khách"} • ${relativeTimeVi(u.createdAt)}`,
     })),
-    ...pendingOpenJobs.map((j) => ({
+    ...pendingJobs.map((j) => ({
       id: `j_${String(j._id)}`,
       kind: "job_open" as const,
       title: j.title,
-      subtitle: `Việc đang mở • ${relativeTimeVi(j.createdAt)}`,
+      subtitle: `Việc chờ duyệt • ${relativeTimeVi(j.createdAt)}`,
     })),
   ].slice(0, 5);
 
@@ -236,7 +240,7 @@ export async function getOverview() {
   activityRows.sort(
     (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
   );
-  const recentActivity = activityRows.slice(0, 8);
+  const recentActivity = activityRows.slice(0, 5);
 
   const recentUserInitials = lastUsersForAvatars
     .map((u) => {
@@ -266,7 +270,7 @@ export async function getOverview() {
     workers: byRole.worker ?? 0,
     admins: byRole.admin ?? 0,
     jobsOpen,
-    jobsPartial: byStatus.partial ?? 0,
+    jobsPartial: 0,
     jobsFull: byStatus.full ?? 0,
     jobsDone,
     totalJobs,
@@ -318,13 +322,36 @@ export async function listUsers(params: {
 
 export async function updateUser(
   targetId: string,
-  body: { role?: string; isVerified?: boolean },
+  body: {
+    name?: string;
+    email?: string;
+    role?: string;
+    isVerified?: boolean;
+    isDeleted?: boolean;
+  },
   adminId: string,
 ) {
-  if (targetId === adminId && body.role && body.role !== "admin") {
-    throw new AppError("Cannot remove own admin role", 400);
+  if (targetId === adminId) {
+    if (body.role && body.role !== "admin") {
+      throw new AppError("Cannot remove own admin role", 400);
+    }
+    if (body.isDeleted === true) {
+      throw new AppError("Cannot delete own admin account", 400);
+    }
   }
   const updates: Record<string, unknown> = {};
+  if (body.name !== undefined) {
+    const name = String(body.name).trim();
+    if (!name) throw new AppError("Tên không được để trống", 400);
+    updates.name = name;
+  }
+  if (body.email !== undefined) {
+    const email = String(body.email).trim().toLowerCase();
+    if (!email.includes("@")) throw new AppError("Email không hợp lệ", 400);
+    const existed = await userModel.findOne({ email, _id: { $ne: targetId } });
+    if (existed) throw new AppError("Email đã tồn tại", 400);
+    updates.email = email;
+  }
   if (body.role !== undefined) {
     if (!["customer", "worker", "admin"].includes(body.role)) {
       throw new AppError("Invalid role", 400);
@@ -333,6 +360,9 @@ export async function updateUser(
   }
   if (body.isVerified !== undefined) {
     updates.isVerified = Boolean(body.isVerified);
+  }
+  if (body.isDeleted !== undefined) {
+    updates.isDeleted = Boolean(body.isDeleted);
   }
   if (Object.keys(updates).length === 0) {
     throw new AppError("No valid fields", 400);
@@ -388,6 +418,7 @@ export async function createUserByAdmin(body: {
     password: hashedPassword,
     role,
     isVerified: Boolean(isVerified),
+    isDeleted: false,
   });
 
   const safeUser = await userModel
@@ -407,7 +438,8 @@ export async function listJobs(params: {
 }) {
   const { page, limit, status, search } = params;
   const q: Record<string, unknown> = {};
-  if (status && ["open", "partial", "full", "done"].includes(status)) {
+  q.isDeleted = { $ne: true };
+  if (status && ["pending", "open", "full", "done"].includes(status)) {
     q.status = status;
   }
   if (search?.trim()) {
@@ -431,43 +463,64 @@ export async function listJobs(params: {
   return { items, total, page, limit };
 }
 
-export async function updateJob(
-  jobId: string,
+export async function createJobByAdmin(
   body: {
+    title: string;
+    description: string;
+    price: number;
+    requiredWorkers?: number;
+    skillTags?: string[];
     status?: string;
-    title?: string;
-    description?: string;
-    price?: number;
+    location?: { lat?: number; lng?: number };
   },
+  adminId: string,
 ) {
-  const updates: Record<string, unknown> = {};
-  if (body.status !== undefined) {
-    if (!["open", "partial", "full", "done"].includes(body.status)) {
-      throw new AppError("Invalid status", 400);
-    }
-    updates.status = body.status;
+  const title = String(body.title ?? "").trim();
+  const description = String(body.description ?? "").trim();
+  const price = Number(body.price);
+  const requiredWorkers = Math.max(1, Number(body.requiredWorkers ?? 1));
+  const status = body.status ?? "pending";
+  const lat = Number(body.location?.lat ?? 0);
+  const lng = Number(body.location?.lng ?? 0);
+
+  if (!title) throw new AppError("Tiêu đề không được để trống", 400);
+  if (!description) throw new AppError("Mô tả không được để trống", 400);
+  if (!Number.isFinite(price) || price < 0) throw new AppError("Giá không hợp lệ", 400);
+  if (!["pending", "open", "full", "done"].includes(status)) {
+    throw new AppError("Invalid status", 400);
   }
-  if (body.title !== undefined) updates.title = String(body.title).trim();
-  if (body.description !== undefined)
-    updates.description = String(body.description);
-  if (body.price !== undefined) {
-    const p = Number(body.price);
-    if (!Number.isFinite(p) || p < 0) throw new AppError("Invalid price", 400);
-    updates.price = p;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new AppError("Vị trí không hợp lệ", 400);
   }
-  if (Object.keys(updates).length === 0)
-    throw new AppError("No valid fields", 400);
+
+  const doc = await jobModel.create({
+    title,
+    description,
+    price,
+    requiredWorkers,
+    skillTags: Array.isArray(body.skillTags)
+      ? body.skillTags.map((x) => String(x).trim()).filter(Boolean)
+      : [],
+    status,
+    location: { lat, lng },
+    createdBy: adminId,
+    assignedWorkers: 0,
+    assignedWorkerIds: [],
+    isDeleted: false,
+  });
+
   const job = await jobModel
-    .findByIdAndUpdate(jobId, updates, { new: true })
+    .findById(doc._id)
     .populate("createdBy", "name email role")
     .lean();
-  if (!job) throw new AppError("Job not found", 404);
+  if (!job) throw new AppError("Không tạo được việc", 500);
   return job;
 }
 
 export async function deleteJob(jobId: string) {
-  const job = await jobModel.findByIdAndDelete(jobId);
-  if (!job) throw new AppError("Job not found", 404);
-  await applicationModel.deleteMany({ jobId: job._id });
+  const job = await jobModel.findById(jobId);
+  if (!job || job.isDeleted) throw new AppError("Job not found", 404);
+  job.isDeleted = true;
+  await job.save();
   return { deleted: true };
 }

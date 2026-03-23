@@ -1,6 +1,5 @@
 import cors from "cors";
 import express, { json, Request, Response } from "express";
-import connectDB from "./config/db";
 import { getCorsOptions } from "./config/corsOptions";
 import authRouter from "./routes/auth.route";
 import applyRouter from "./routes/apply.route";
@@ -11,14 +10,13 @@ import { errorHandler } from "./middlewares/error.middlewares";
 
 const app = express();
 
-connectDB();
 app.use(cors(getCorsOptions()));
 app.use(json());
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ ok: true });
 });
 app.get("/", (_req: Request, res: Response) => {
-  res.json("Connect succesfull");
+  res.json("Connect successful");
 });
 app.use("/auth", authRouter);
 app.use("/jobs", jobRouter);

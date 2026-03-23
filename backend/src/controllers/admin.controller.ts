@@ -45,7 +45,13 @@ export const adminListUsersController = asyncHandler(
 export const adminUpdateUserController = asyncHandler(
   async (req: Request, res: Response) => {
     const id = paramId(req);
-    const body = req.body as { role?: string; isVerified?: boolean };
+    const body = req.body as {
+      name?: string;
+      email?: string;
+      role?: string;
+      isVerified?: boolean;
+      isDeleted?: boolean;
+    };
     const data = await adminService.updateUser(id, body, req.user!.id);
     res.json({ success: true, data });
   },
@@ -79,20 +85,6 @@ export const adminListJobsController = asyncHandler(
       ...(status ? { status } : {}),
       ...(search !== undefined && search !== "" ? { search } : {}),
     });
-    res.json({ success: true, data });
-  },
-);
-
-export const adminUpdateJobController = asyncHandler(
-  async (req: Request, res: Response) => {
-    const id = paramId(req);
-    const body = req.body as {
-      status?: string;
-      title?: string;
-      description?: string;
-      price?: number;
-    };
-    const data = await adminService.updateJob(id, body);
     res.json({ success: true, data });
   },
 );

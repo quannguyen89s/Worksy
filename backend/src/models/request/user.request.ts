@@ -9,3 +9,23 @@ export interface RegisterRequestBody {
     password: string
     confirm_password: string
 }
+
+export interface VerifyEmailRequestBody {
+    emailVerifyToken: string
+}
+
+export interface ForgotPasswordRequestBody {
+    email: string
+}
+
+export interface VerifyForgotPasswordOTPRequestBody {
+    email: string
+    otp: string
+}
+
+export interface ResetPasswordRequestBody {
+    email: string
+    otp: string
+    password: string
+    confirm_password: string
+}

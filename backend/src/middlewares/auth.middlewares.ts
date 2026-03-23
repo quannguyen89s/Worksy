@@ -1,65 +1,88 @@
-import { checkSchema, type Meta } from "express-validator";
+import { NextFunction, Request, Response } from "express";
+import { checkSchema } from "express-validator";
 import userModel from "../models/user.model";
 import { validate } from "../utils/validation";
+import USER_MESSAGE from "../constants/userMessage";
+import jwt from "jsonwebtoken";
 
-const loginValidator = checkSchema({
+export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    if (!token) {
+        return res.status(401).json({ message: USER_MESSAGE.TOKEN_REQUIRED });
+    }
+    jwt.verify(token, process.env.JWT_SECRET_ACCESS_TOKEN!, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: USER_MESSAGE.INVALID_TOKEN });
+        }
+        const decoded = user as { _id: string; role: string };
+        req.user = { id: decoded._id, role: decoded.role, name: '' };
+        next();
+    });
+}
+
+export const authorizeToken = (...roles: string[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        const authHeader = req.headers["authorization"];
+        const token = authHeader && authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({ message: USER_MESSAGE.TOKEN_REQUIRED });
+        }
+        jwt.verify(token, process.env.JWT_SECRET_ACCESS_TOKEN!, (err, user) => {
+            if (err) {
+                return res.status(403).json({ message: USER_MESSAGE.INVALID_TOKEN });
+            }
+            const decoded = user as { _id: string; role: string };
+            if (!roles.includes(decoded.role)) {
+                return res.status(403).json({ message: USER_MESSAGE.UNAUTHORIZED });
+            }
+            req.user = { id: decoded._id, role: decoded.role, name: '' };
+            next();
+        });
+    };
+}
+
+export const loginValidator = validate(checkSchema({
     email: {
         notEmpty: {
-            errorMessage: "Email không được để trống",
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
         },
         isEmail: {
-            errorMessage: "Email không hợp lệ",
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
         },
         trim: true,
     },
     password: {
         notEmpty: {
-            errorMessage: "Mật khẩu không được để trống",
-        },
-        isLength: {
-            options: { min: 6 },
-            errorMessage: "Mật khẩu phải có ít nhất 6 ký tự",
-        },
-        matches: {
-            options: /[A-Z]/,
-            errorMessage: "Mật khẩu phải có ít nhất 1 chữ viết hoa",
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
         },
     },
-}, ["body"]);
+}, ["body"]));
 
-const registerValidator = checkSchema({
+export const registerValidator = validate(checkSchema({
     name: {
         notEmpty: {
-            errorMessage: "Tên không được để trống",
+            errorMessage: USER_MESSAGE.NAME_REQUIRED,
         },
         isLength: {
             options: { min: 2, max: 50 },
-            errorMessage: "Tên phải từ 2 đến 50 ký tự",
+            errorMessage: USER_MESSAGE.NAME_LENGTH,
         },
         trim: true,
-        custom: {
-            options: async (value: string) => {
-                const user = await userModel.findOne({ name: value });
-                if (user) {
-                    throw new Error("Tên đã tồn tại");
-                }
-                return true;
-            },
-        },
     },
     email: {
         notEmpty: {
-            errorMessage: "Email không được để trống",
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
         },
         isEmail: {
-            errorMessage: "Email không hợp lệ",
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
         },
         trim: true,
         custom: {
             options: async (value: string) => {
                 const user = await userModel.findOne({ email: value });
                 if (user) {
-                    throw new Error("Email đã tồn tại");
+                    throw new Error(USER_MESSAGE.EMAIL_ALREADY_EXISTS);
                 }
                 return true;
             },
@@ -67,20 +90,20 @@ const registerValidator = checkSchema({
     },
     password: {
         notEmpty: {
-            errorMessage: "Mật khẩu không được để trống",
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
         },
         isLength: {
             options: { min: 6 },
-            errorMessage: "Mật khẩu phải có ít nhất 6 ký tự",
+            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
         },
         matches: {
             options: /[A-Z]/,
-            errorMessage: "Mật khẩu phải có ít nhất 1 chữ viết hoa",
+            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
         },
         custom: {
             options: (value: string) => {
                 if (!/[0-9]/.test(value)) {
-                    throw new Error("Mật khẩu phải có ít nhất 1 chữ số");
+                    throw new Error(USER_MESSAGE.PASSWORD_NUMBER);
                 }
                 return true;
             },
@@ -88,18 +111,135 @@ const registerValidator = checkSchema({
     },
     confirm_password: {
         notEmpty: {
-            errorMessage: "Xác nhận mật khẩu không được để trống",
+            errorMessage: USER_MESSAGE.CONFIRM_PASSWORD_REQUIRED,
         },
         custom: {
-            options: (value: unknown, { req }: Meta) => {
+            options: (value, { req }) => {
                 if (value !== req.body.password) {
-                    throw new Error("Xác nhận mật khẩu không khớp");
+                    throw new Error(USER_MESSAGE.CONFIRM_PASSWORD_NOT_MATCH);
                 }
                 return true;
             },
         },
     },
-}, ["body"]);
+}, ["body"]));
 
-export const loginMiddleware = validate(loginValidator);
-export const registerMiddleware = validate(registerValidator);
+export const emailVerifyValidator = validate(checkSchema({
+    emailVerifyToken: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_VERIFY_TOKEN_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.EMAIL_VERIFY_TOKEN_MUST_BE_STRING,
+        },
+        trim: true,
+    },
+}, ["body"]));
+
+export const resendVerifyEmailValidator = validate(checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+}, ["body"]));
+
+export const forgotPasswordValidator = validate(checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+}, ["body"]));
+
+export const verifyOTPValidator = validate(checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+    otp: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.OTP_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.OTP_MUST_BE_STRING,
+        },
+        isLength: {
+            options: { min: 6, max: 6 },
+            errorMessage: USER_MESSAGE.OTP_INVALID_FORMAT,
+        },
+        trim: true,
+    },
+}, ["body"]));
+
+export const resetPasswordValidator = validate(checkSchema({
+    email: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.EMAIL_REQUIRED,
+        },
+        isEmail: {
+            errorMessage: USER_MESSAGE.EMAIL_INVALID,
+        },
+        trim: true,
+    },
+    otp: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.OTP_REQUIRED,
+        },
+        isString: {
+            errorMessage: USER_MESSAGE.OTP_MUST_BE_STRING,
+        },
+        isLength: {
+            options: { min: 6, max: 6 },
+            errorMessage: USER_MESSAGE.OTP_INVALID_FORMAT,
+        },
+        trim: true,
+    },
+    password: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
+        },
+        isLength: {
+            options: { min: 6 },
+            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
+        },
+        matches: {
+            options: /[A-Z]/,
+            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
+        },
+        custom: {
+            options: (value: string) => {
+                if (!/[0-9]/.test(value)) {
+                    throw new Error(USER_MESSAGE.PASSWORD_NUMBER);
+                }
+                return true;
+            },
+        },
+    },
+    confirm_password: {
+        notEmpty: {
+            errorMessage: USER_MESSAGE.CONFIRM_PASSWORD_REQUIRED,
+        },
+        custom: {
+            options: (value, { req }) => {
+                if (value !== req.body.password) {
+                    throw new Error(USER_MESSAGE.CONFIRM_PASSWORD_NOT_MATCH);
+                }
+                return true;
+            },
+        },
+    },
+}, ["body"]));

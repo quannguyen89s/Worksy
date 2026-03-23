@@ -58,6 +58,46 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
   res.status(201).json({ success: true, data });
 });
 
+export const updateJobController = asyncHandler(async (req: Request, res: Response) => {
+  const customerId = req.user!.id;
+  const {
+    title,
+    description,
+    price,
+    location,
+    requiredWorkers,
+    skillTags,
+  } = req.body as {
+    title?: string;
+    description?: string;
+    price?: number;
+    location?: { lat: number; lng: number };
+    requiredWorkers?: number;
+    skillTags?: string[];
+  };
+  const payload: {
+    title?: string;
+    description?: string;
+    price?: number;
+    location?: { lat: number; lng: number };
+    requiredWorkers?: number;
+    skillTags?: string[];
+  } = {};
+  if (title !== undefined) payload.title = title;
+  if (description !== undefined) payload.description = description;
+  if (price !== undefined) payload.price = price;
+  if (location !== undefined) payload.location = location;
+  if (requiredWorkers !== undefined) payload.requiredWorkers = requiredWorkers;
+  if (skillTags !== undefined) payload.skillTags = skillTags;
+  const data = await jobService.updateJob(paramId(req), customerId, payload);
+  res.json({ success: true, data });
+});
+
+export const deleteJobController = asyncHandler(async (req: Request, res: Response) => {
+  const data = await jobService.deleteJob(paramId(req), req.user!.id);
+  res.json({ success: true, data });
+});
+
 export const listMyJobsController = asyncHandler(async (req: Request, res: Response) => {
   const data = await jobService.listMyJobs(req.user!.id);
   res.json({ success: true, data });
@@ -102,5 +142,15 @@ export const selectWorkersController = asyncHandler(
 
 export const completeJobController = asyncHandler(async (req: Request, res: Response) => {
   const data = await jobService.completeJob(paramId(req), req.user!.id);
+  res.json({ success: true, data });
+});
+
+export const listPendingJobsController = asyncHandler(async (req: Request, res: Response) => {
+  const data = await jobService.listPendingJobs();
+  res.json({ success: true, data });
+});
+
+export const approveJobController = asyncHandler(async (req: Request, res: Response) => {
+  const data = await jobService.approveJob(paramId(req));
   res.json({ success: true, data });
 });

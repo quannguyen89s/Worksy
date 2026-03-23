@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import type { RootStackParamList } from '@/navigation/types';
 import {
   decodeJwtName,
@@ -25,6 +26,7 @@ import {
   type RecentActivityRow,
   type UserRow,
 } from '@/api/adminApi';
+import authService from '@/services/authService';
 import { adminTheme } from '@/constants/adminTheme';
 
 type Props = StackScreenProps<RootStackParamList, 'AdminDashboard'>;
@@ -32,7 +34,6 @@ type Props = StackScreenProps<RootStackParamList, 'AdminDashboard'>;
 const T = adminTheme;
 
 const TAB_H = 58;
-const FAB_SIZE = 56;
 
 const moneyFull = (n: number) =>
   new Intl.NumberFormat('vi-VN', {
@@ -60,8 +61,8 @@ function roleLabel(role: string): string {
 }
 
 function statusUser(u: UserRow): { text: string; color: string } {
-  if (u.isVerified) return { text: 'Hoạt động', color: T.trendGreen };
-  return { text: 'Chờ duyệt', color: T.pendingOrange };
+  if (u.isVerified) return { text: 'Đã xác minh', color: T.trendGreen };
+  return { text: 'Chưa xác minh', color: T.pendingOrange };
 }
 
 function nowLabel(): string {
@@ -134,9 +135,27 @@ export default function AdminDashboardScreen({ navigation }: Props) {
     );
   }, [userPreview, search]);
 
+  const pendingJobsOnly = useMemo(
+    () => (data?.pendingApprovals ?? []).filter((row) => row.kind === 'job_open'),
+    [data],
+  );
+
   async function logout() {
-    await setAdminToken(null);
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    try {
+      const accessToken = await SecureStore.getItemAsync('accessToken');
+      if (accessToken) {
+        await authService.logout(accessToken);
+      }
+    } catch {
+      // Ignore API logout failures; local token cleanup still proceeds.
+    } finally {
+      await Promise.all([
+        setAdminToken(null),
+        SecureStore.deleteItemAsync('accessToken'),
+        SecureStore.deleteItemAsync('refreshToken'),
+      ]);
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
   }
 
   function openMenu() {
@@ -195,7 +214,7 @@ export default function AdminDashboardScreen({ navigation }: Props) {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + FAB_SIZE }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset }]}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.pageTitle}>Tổng quan hệ thống</Text>
         <Text style={styles.pageTime}>{nowLabel()}</Text>
@@ -279,25 +298,21 @@ export default function AdminDashboardScreen({ navigation }: Props) {
             {/* Cần phê duyệt */}
             <View style={styles.sectionHead}>
               <Text style={styles.sectionTitle}>Cần phê duyệt</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('AdminUsers')}>
+              <TouchableOpacity onPress={() => navigation.navigate('AdminJobs')}>
                 <Text style={styles.viewAll}>Xem tất cả</Text>
               </TouchableOpacity>
             </View>
-            {data.pendingApprovals.length === 0 ? (
+            {pendingJobsOnly.length === 0 ? (
               <Text style={styles.emptySection}>Không có mục chờ xử lý.</Text>
             ) : (
-              data.pendingApprovals.map((row) => {
+              pendingJobsOnly.map((row) => {
                 const pv = pendingVisual(row);
                 return (
                   <TouchableOpacity
                     key={row.id}
                     style={styles.pendingCard}
                     activeOpacity={0.85}
-                    onPress={() =>
-                      row.kind === 'job_open'
-                        ? navigation.navigate('AdminJobs')
-                        : navigation.navigate('AdminUsers')
-                    }>
+                    onPress={() => navigation.navigate('AdminJobs')}>
                     <View style={[styles.pendingIcon, { backgroundColor: `${pv.tint}33` }]}>
                       <Ionicons name={pv.icon} size={22} color={pv.tint} />
                     </View>
@@ -404,16 +419,6 @@ export default function AdminDashboardScreen({ navigation }: Props) {
           </>
         ) : null}
       </ScrollView>
-
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          { bottom: TAB_H + Math.max(insets.bottom, 10) + 8 },
-        ]}
-        activeOpacity={0.9}
-        onPress={() => navigation.navigate('AdminJobs')}>
-        <Ionicons name="add" size={30} color="#fff" />
-      </TouchableOpacity>
 
       <View
         style={[
@@ -704,24 +709,6 @@ const styles = StyleSheet.create({
   emptyUsers: { paddingVertical: 20, textAlign: 'center', color: T.brownMuted, fontSize: 14 },
   fullListBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 10 },
   fullListBtnText: { fontSize: 14, fontWeight: '700', color: T.gold },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
-    backgroundColor: T.brown,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: T.brown,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 4,
-    borderColor: T.pageTint,
-    zIndex: 20,
-  },
   tabBar: {
     position: 'absolute',
     left: 0,

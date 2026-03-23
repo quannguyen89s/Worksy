@@ -105,6 +105,7 @@ export type UserRow = {
   email: string;
   role: string;
   isVerified: boolean;
+  isDeleted?: boolean;
   rating?: number;
   completedJobs?: number;
   createdAt?: string;
@@ -166,7 +167,16 @@ export async function fetchUsers(params: {
   return res.data.data;
 }
 
-export async function patchUser(id: string, body: { role?: string; isVerified?: boolean }) {
+export async function patchUser(
+  id: string,
+  body: {
+    name?: string;
+    email?: string;
+    role?: string;
+    isVerified?: boolean;
+    isDeleted?: boolean;
+  }
+) {
   const res = await client.patch<{ success: boolean; data: UserRow }>(`/admin/users/${id}`, body);
   return res.data.data;
 }
@@ -194,16 +204,8 @@ export async function fetchJobs(params: {
   return res.data.data;
 }
 
-export async function patchJob(
-  id: string,
-  body: {
-    status?: string;
-    title?: string;
-    description?: string;
-    price?: number;
-  }
-) {
-  const res = await client.patch<{ success: boolean; data: JobRow }>(`/admin/jobs/${id}`, body);
+export async function approveJob(id: string) {
+  const res = await client.patch<{ success: boolean; data: JobRow }>(`/jobs/${id}/approve`);
   return res.data.data;
 }
 

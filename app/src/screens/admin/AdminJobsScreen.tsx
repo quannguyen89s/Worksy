@@ -7,22 +7,21 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
-import { deleteJob, fetchJobs, patchJob, toErrMessage, type JobRow } from '@/api/adminApi';
+import { approveJob, deleteJob, fetchJobs, toErrMessage, type JobRow } from '@/api/adminApi';
 import { adminTheme } from '@/constants/adminTheme';
 import AdminBottomBar from '@/screens/admin/AdminBottomBar';
 
 type Props = StackScreenProps<RootStackParamList, 'AdminJobs'>;
 
-const STATUSES = ['open', 'partial', 'full', 'done'] as const;
+const STATUSES = ['pending', 'open', 'full', 'done'] as const;
 const STATUS_LABEL: Record<string, string> = {
+  pending: 'Chờ duyệt',
   open: 'Đang mở',
-  partial: 'Một phần',
   full: 'Đủ người',
   done: 'Hoàn thành',
 };
@@ -49,14 +48,9 @@ export default function AdminJobsScreen({ navigation }: Props) {
   const [searchInput, setSearchInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<JobRow | null>(null);
   const [deleting, setDeleting] = useState<JobRow | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editPrice, setEditPrice] = useState('');
-  const [editStatus, setEditStatus] = useState<string>('open');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -83,39 +77,6 @@ export default function AdminJobsScreen({ navigation }: Props) {
     }, [load])
   );
 
-  function openEdit(job: JobRow) {
-    setEditing(job);
-    setEditTitle(job.title);
-    setEditDesc(job.description);
-    setEditPrice(String(job.price));
-    setEditStatus(job.status);
-  }
-
-  async function saveEdit() {
-    if (!editing) return;
-    const price = Number(editPrice);
-    if (!Number.isFinite(price) || price < 0) {
-      setError('Giá không hợp lệ');
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await patchJob(editing._id, {
-        title: editTitle.trim(),
-        description: editDesc,
-        price,
-        status: editStatus,
-      });
-      setEditing(null);
-      await load();
-    } catch (e) {
-      setError(toErrMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function confirmDelete() {
     if (!deleting) return;
     setSaving(true);
@@ -128,6 +89,19 @@ export default function AdminJobsScreen({ navigation }: Props) {
       setError(toErrMessage(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function approvePendingJob(jobId: string) {
+    setApprovingId(jobId);
+    setError(null);
+    try {
+      await approveJob(jobId);
+      await load();
+    } catch (e) {
+      setError(toErrMessage(e));
+    } finally {
+      setApprovingId(null);
     }
   }
 
@@ -306,14 +280,19 @@ export default function AdminJobsScreen({ navigation }: Props) {
                 </View>
               ) : null}
               <View className="mt-3 flex-row gap-2">
-                <TouchableOpacity
-                  className="flex-1 items-center rounded-xl py-2.5"
-                  style={{ backgroundColor: adminTheme.pillBg }}
-                  onPress={() => openEdit(job)}>
-                  <Text className="font-semibold" style={{ color: adminTheme.brown }}>
-                    Sửa
-                  </Text>
-                </TouchableOpacity>
+                {job.status === 'pending' ? (
+                  <TouchableOpacity
+                    className="flex-1 items-center rounded-xl py-2.5"
+                    style={{ backgroundColor: adminTheme.teal, opacity: approvingId === job._id ? 0.7 : 1 }}
+                    onPress={() => void approvePendingJob(job._id)}
+                    disabled={approvingId === job._id}>
+                    {approvingId === job._id ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text className="font-semibold text-white">Duyệt</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   className="flex-1 items-center rounded-xl py-2.5"
                   style={{ backgroundColor: adminTheme.danger }}
@@ -352,108 +331,6 @@ export default function AdminJobsScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={!!editing} animationType="slide" transparent>
-        <View className="flex-1 justify-end bg-black/40">
-          <View
-            className="max-h-[88%] rounded-t-3xl"
-            style={{ backgroundColor: adminTheme.bgPage }}>
-            <ScrollView className="p-5" keyboardShouldPersistTaps="handled">
-              <Text className="mb-3 text-lg font-bold" style={{ color: adminTheme.brown }}>
-                Chỉnh sửa việc làm
-              </Text>
-              <Text className="mb-1 text-xs font-semibold" style={{ color: adminTheme.brown }}>
-                Tiêu đề
-              </Text>
-              <TextInput
-                className="mb-3 rounded-xl px-3 py-2"
-                style={{
-                  backgroundColor: adminTheme.card,
-                  borderWidth: 1,
-                  borderColor: adminTheme.borderSoft,
-                  color: adminTheme.brownMid,
-                }}
-                value={editTitle}
-                onChangeText={setEditTitle}
-              />
-              <Text className="mb-1 text-xs font-semibold" style={{ color: adminTheme.brown }}>
-                Mô tả
-              </Text>
-              <TextInput
-                className="mb-3 min-h-[100px] rounded-xl px-3 py-2"
-                style={{
-                  backgroundColor: adminTheme.card,
-                  borderWidth: 1,
-                  borderColor: adminTheme.borderSoft,
-                  color: adminTheme.brownMid,
-                  textAlignVertical: 'top',
-                }}
-                multiline
-                value={editDesc}
-                onChangeText={setEditDesc}
-              />
-              <Text className="mb-1 text-xs font-semibold" style={{ color: adminTheme.brown }}>
-                Giá (VND)
-              </Text>
-              <TextInput
-                className="mb-3 rounded-xl px-3 py-2"
-                keyboardType="numeric"
-                style={{
-                  backgroundColor: adminTheme.card,
-                  borderWidth: 1,
-                  borderColor: adminTheme.borderSoft,
-                  color: adminTheme.brownMid,
-                }}
-                value={editPrice}
-                onChangeText={setEditPrice}
-              />
-              <Text className="mb-1 text-xs font-semibold" style={{ color: adminTheme.brown }}>
-                Trạng thái
-              </Text>
-              <View className="mb-4 flex-row flex-wrap gap-2">
-                {STATUSES.map((s) => (
-                  <TouchableOpacity
-                    key={s}
-                    className="rounded-full px-3 py-1.5"
-                    style={{
-                      backgroundColor: editStatus === s ? adminTheme.brown : adminTheme.pillBg,
-                    }}
-                    onPress={() => setEditStatus(s)}>
-                    <Text
-                      style={{
-                        color: editStatus === s ? '#fff' : adminTheme.brown,
-                        fontSize: 12,
-                        fontWeight: '600',
-                      }}>
-                      {STATUS_LABEL[s]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <View className="flex-row gap-2 pb-6">
-                <TouchableOpacity
-                  className="flex-1 items-center rounded-xl border py-3"
-                  style={{ borderColor: adminTheme.borderSoft }}
-                  onPress={() => setEditing(null)}
-                  disabled={saving}>
-                  <Text style={{ color: adminTheme.brown }}>Hủy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  className="flex-1 items-center rounded-xl py-3"
-                  style={{ backgroundColor: adminTheme.brown }}
-                  onPress={() => void saveEdit()}
-                  disabled={saving}>
-                  {saving ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text className="font-semibold text-white">Lưu</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       <Modal visible={!!deleting} animationType="fade" transparent>
         <View
           className="flex-1 justify-center px-6"
@@ -466,10 +343,10 @@ export default function AdminJobsScreen({ navigation }: Props) {
               borderColor: adminTheme.borderSoft,
             }}>
             <Text className="text-lg font-bold" style={{ color: adminTheme.brown }}>
-              Xóa việc làm?
+              Xác nhận xóa việc làm
             </Text>
             <Text className="mt-2 text-sm" style={{ color: adminTheme.brownMuted }}>
-              {deleting?.title} — không hoàn tác. Đơn ứng tuyển liên quan cũng bị xóa.
+              Bạn sắp xóa việc "{deleting?.title}". Đây là xóa mềm, có thể khôi phục trong database.
             </Text>
             <View className="mt-5 flex-row gap-2">
               <TouchableOpacity
@@ -487,7 +364,7 @@ export default function AdminJobsScreen({ navigation }: Props) {
                 {saving ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text className="font-semibold text-white">Xóa</Text>
+                  <Text className="font-semibold text-white">Xác nhận xóa</Text>
                 )}
               </TouchableOpacity>
             </View>

@@ -5,7 +5,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { RootStackParamList } from '@/navigation/types';
+import LoginScreen from '@/components/authScreens/LoginScreen';
+import RegisterScreen from '@/components/authScreens/RegisterScreen';
 import HomeScreen from '@/screens/HomeScreen';
+import MyJobsScreen from '@/screens/MyJobsScreen';
 import AdminDashboardScreen from '@/screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '@/screens/admin/AdminUsersScreen';
 import AdminJobsScreen from '@/screens/admin/AdminJobsScreen';
@@ -19,13 +22,16 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Home"
+          initialRouteName="Login"
           detachInactiveScreens={false}
           screenOptions={{
             headerShown: false,
             cardStyle: { backgroundColor: '#FEF9E7' },
           }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="MyJobs" component={MyJobsScreen} />
           <Stack.Screen
             name="AdminDashboard"
             component={AdminDashboardScreen}

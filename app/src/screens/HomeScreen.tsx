@@ -1,83 +1,128 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
-// header & nút xám nhạt, bg giữ nguyên
 const COLORS = {
-  main: '#D1D5DB',
-  light: '#D1D5DB',
-  dark: '#4B5563',
+  primary: '#D97706',
+  primaryLight: '#FEF3C7',
+  background: '#FFFBEB',
+  card: '#FFFFFF',
+  text: '#1F2937',
+  textMuted: '#6B7280',
 };
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
+
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8E7' }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
       {/* Header */}
-      <View className="px-6 py-5" style={{ backgroundColor: COLORS.main }}>
-        <Text className="text-2xl font-bold" style={{ color: COLORS.dark }}>Worksy</Text>
-        <Text className="text-base mt-1 opacity-80" style={{ color: COLORS.dark }}>Chào mừng bạn trở lại</Text>
+      <View style={styles.header}>
+        <Text style={styles.logo}>Worksy</Text>
+        <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
       </View>
 
-      {/* Main content */}
-      <ScrollView className="flex-1" contentContainerClassName="p-6">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Quick actions */}
-        <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
-          <Text className="text-slate-800 text-lg font-semibold mb-4">
-            Thao tác nhanh
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
-            <TouchableOpacity
-              className="px-5 py-3 rounded-xl"
-              style={{ backgroundColor: COLORS.light }}
-              activeOpacity={0.7}
-            >
-              <Text className="font-medium" style={{ color: COLORS.dark }}>Tìm việc</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thao tác nhanh</Text>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8}>
+              <Text style={styles.actionBtnText}>🔍 Tìm việc</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8}>
+              <Text style={styles.actionBtnText}>📝 Đăng tin</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              className="px-5 py-3 rounded-xl"
-              style={{ backgroundColor: COLORS.light }}
-              activeOpacity={0.7}
+              style={styles.actionBtn}
+              activeOpacity={0.8}
+              onPress={() => (navigation as { navigate: (name: string) => void }).navigate('MyJobs')}
             >
-              <Text className="font-medium" style={{ color: COLORS.dark }}>Đăng tin</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              className="px-5 py-3 rounded-xl"
-              style={{ backgroundColor: COLORS.light }}
-              activeOpacity={0.7}
-            >
-              <Text className="font-medium" style={{ color: COLORS.dark }}>Tin của tôi</Text>
+              <Text style={styles.actionBtnText}>📋 Tin của tôi</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Stats */}
-        <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
-          <Text className="text-slate-800 text-lg font-semibold mb-4">
-            Tổng quan
-          </Text>
-          <View className="flex-row justify-between">
-            <View className="rounded-xl p-4 flex-1 mr-2" style={{ backgroundColor: COLORS.light }}>
-              <Text className="text-sm" style={{ color: COLORS.dark }}>Việc đã xem</Text>
-              <Text className="text-2xl font-bold mt-1" style={{ color: COLORS.dark }}>0</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Tổng quan</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Việc đã xem</Text>
+              <Text style={styles.statValue}>0</Text>
             </View>
-            <View className="rounded-xl p-4 flex-1" style={{ backgroundColor: COLORS.light }}>
-              <Text className="text-sm" style={{ color: COLORS.dark }}>Tin đã đăng</Text>
-              <Text className="text-2xl font-bold mt-1" style={{ color: COLORS.dark }}>0</Text>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>Tin đã đăng</Text>
+              <Text style={styles.statValue}>0</Text>
             </View>
           </View>
         </View>
 
         {/* Recent */}
-        <View className="bg-white rounded-2xl p-5 shadow-sm">
-          <Text className="text-slate-800 text-lg font-semibold mb-4">
-            Việc làm mới nhất
-          </Text>
-          <View className="rounded-xl p-4" style={{ backgroundColor: COLORS.light }}>
-            <Text className="text-center py-8" style={{ color: COLORS.dark }}>
-              Chưa có việc làm nào
-            </Text>
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  logo: { fontSize: 28, fontWeight: '800', color: '#1F2937' },
+  greeting: { fontSize: 15, color: '#6B7280', marginTop: 4 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardTitle: { fontSize: 17, fontWeight: '600', color: '#1F2937', marginBottom: 16 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  actionBtn: {
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  actionBtnText: { color: '#92400E', fontWeight: '600', fontSize: 15 },
+  statsRow: { flexDirection: 'row', gap: 12 },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statLabel: { fontSize: 14, color: '#6B7280' },
+  statValue: { fontSize: 24, fontWeight: '700', color: '#1F2937', marginTop: 4 },
+  emptyBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  emptyText: { fontSize: 15, color: '#9CA3AF' },
+});

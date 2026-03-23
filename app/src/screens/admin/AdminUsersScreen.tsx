@@ -59,6 +59,14 @@ export default function AdminUsersScreen({ navigation }: Props) {
   const [addIsVerified, setAddIsVerified] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<string>('customer');
+  const [editIsVerified, setEditIsVerified] = useState(false);
+  const [editIsDeleted, setEditIsDeleted] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -85,7 +93,10 @@ export default function AdminUsersScreen({ navigation }: Props) {
     }, [load])
   );
 
-  async function updateRow(id: string, body: { role?: string; isVerified?: boolean }) {
+  async function updateRow(
+    id: string,
+    body: { role?: string; isVerified?: boolean; isDeleted?: boolean }
+  ) {
     setBusyId(id);
     setError(null);
     try {
@@ -95,6 +106,37 @@ export default function AdminUsersScreen({ navigation }: Props) {
       setError(toErrMessage(e));
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function openEditUser(u: UserRow) {
+    setEditError(null);
+    setEditing(u);
+    setEditName(u.name);
+    setEditEmail(u.email);
+    setEditRole(u.role);
+    setEditIsVerified(Boolean(u.isVerified));
+    setEditIsDeleted(Boolean(u.isDeleted));
+  }
+
+  async function saveEditUser() {
+    if (!editing) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await patchUser(editing._id, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+        role: editRole,
+        isVerified: editIsVerified,
+        isDeleted: editIsDeleted,
+      });
+      setEditing(null);
+      await load();
+    } catch (e) {
+      setEditError(toErrMessage(e));
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -207,7 +249,10 @@ export default function AdminUsersScreen({ navigation }: Props) {
         <FlatList
           data={items}
           keyExtractor={(u) => u._id}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomBarHeight + 20 }}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: bottomBarHeight + 70,
+          }}
           refreshing={loading}
           onRefresh={() => void load()}
           ListEmptyComponent={
@@ -260,20 +305,63 @@ export default function AdminUsersScreen({ navigation }: Props) {
                   {u.isVerified ? 'Đã xác minh · Chạm để tắt' : 'Chưa xác minh · Bật'}
                 </Text>
               </TouchableOpacity>
-              <Text className="mt-2 text-xs" style={{ color: adminTheme.brownMuted }}>
-                Đánh giá {u.rating?.toFixed(1) ?? '—'} · Việc xong {u.completedJobs ?? 0}
-              </Text>
+              <View className="mt-3">
+                <Text className="text-xs" style={{ color: adminTheme.brownMuted }}>
+                  Đánh giá {u.rating?.toFixed(1) ?? '—'} · Việc xong {u.completedJobs ?? 0}
+                  {u.isDeleted ? ' · Đã xóa' : ''}
+                </Text>
+              </View>
+              <View className="mt-3 flex-row gap-2">
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
+                  style={{
+                    backgroundColor: adminTheme.brownMid,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    opacity: busyId === u._id ? 0.6 : 1,
+                  }}
+                  disabled={busyId === u._id}
+                  onPress={() => openEditUser(u)}>
+                  <Ionicons name="create-outline" size={14} color="#fff" />
+                  <Text className="text-xs font-semibold" style={{ color: '#fff' }}>
+                    Chỉnh sửa
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="flex-1 flex-row items-center justify-center rounded-xl px-3 py-2.5"
+                  style={{
+                    backgroundColor: u.isDeleted ? '#DCFCE7' : '#FEE2E2',
+                    borderWidth: 1,
+                    borderColor: u.isDeleted ? '#86EFAC' : '#FCA5A5',
+                    gap: 6,
+                    opacity: busyId === u._id ? 0.6 : 1,
+                  }}
+                  disabled={busyId === u._id}
+                  onPress={() => void updateRow(u._id, { isDeleted: !Boolean(u.isDeleted) })}>
+                  <Ionicons
+                    name={u.isDeleted ? 'refresh-outline' : 'trash-outline'}
+                    size={14}
+                    color={u.isDeleted ? adminTheme.teal : adminTheme.danger}
+                  />
+                  <Text
+                    className="text-xs font-semibold"
+                    style={{ color: u.isDeleted ? adminTheme.teal : adminTheme.danger }}>
+                    {u.isDeleted ? 'Khôi phục' : 'Xóa'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         />
       )}
 
       <View
-        className="flex-row items-center justify-center gap-4 border-t py-3"
+        className="absolute left-0 right-0 flex-row items-center justify-center gap-4 border-t py-3"
         style={{
           borderTopColor: adminTheme.borderSoft,
           backgroundColor: adminTheme.card,
-          marginBottom: bottomBarHeight,
+          bottom: bottomBarHeight,
         }}>
         <TouchableOpacity
           disabled={page <= 1}
@@ -495,6 +583,25 @@ export default function AdminUsersScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 </View>
 
+                <View className="flex-row items-center justify-between">
+                  <Text style={{ color: adminTheme.brown, fontSize: 13, fontWeight: '700' }}>
+                    Xóa
+                  </Text>
+                  <TouchableOpacity
+                    disabled={editBusy}
+                    onPress={() => setEditIsDeleted((v) => !v)}
+                    style={{
+                      backgroundColor: editIsDeleted ? adminTheme.danger : adminTheme.pillBg,
+                      borderRadius: 16,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                    }}>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+                      {editIsDeleted ? 'Đã xóa' : 'Đang hoạt động'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 <View className="flex-row gap-3 mt-2">
                   <TouchableOpacity
                     className="flex-1 items-center rounded-xl py-3"
@@ -541,6 +648,148 @@ export default function AdminUsersScreen({ navigation }: Props) {
                   onPress={() => setAddOpen(false)}>
                   <Text style={{ color: adminTheme.brownMuted, fontWeight: '800' }}>Hủy</Text>
                 </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!editing} animationType="slide" transparent>
+        <View className="flex-1" style={{ backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: adminTheme.bgPage,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 16,
+              paddingBottom: 24,
+              minHeight: 240,
+            }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: bottomBarHeight + 20 }} keyboardShouldPersistTaps="handled">
+              <View className="flex-row items-center justify-between">
+                <Text style={{ fontSize: 18, fontWeight: '900', color: adminTheme.brown }}>
+                  Chỉnh sửa người dùng
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (editBusy) return;
+                    setEditing(null);
+                  }}
+                  hitSlop={10}>
+                  <Text style={{ color: adminTheme.brownMuted, fontSize: 16 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {editError ? (
+                <View className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
+                  <Text style={{ color: adminTheme.danger, fontSize: 13 }}>{editError}</Text>
+                </View>
+              ) : null}
+
+              <View className="mt-4 gap-3">
+                <View>
+                  <Text style={{ color: adminTheme.brown, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>
+                    Tên
+                  </Text>
+                  <TextInput
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Tên đầy đủ"
+                    placeholderTextColor={adminTheme.brownMuted}
+                    style={{
+                      backgroundColor: adminTheme.card,
+                      borderWidth: 1,
+                      borderColor: adminTheme.borderSoft,
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      color: adminTheme.brownMid,
+                    }}
+                  />
+                </View>
+
+                <View>
+                  <Text style={{ color: adminTheme.brown, fontSize: 13, fontWeight: '700', marginBottom: 6 }}>
+                    Email
+                  </Text>
+                  <TextInput
+                    value={editEmail}
+                    onChangeText={setEditEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    placeholder="you@email.com"
+                    placeholderTextColor={adminTheme.brownMuted}
+                    style={{
+                      backgroundColor: adminTheme.card,
+                      borderWidth: 1,
+                      borderColor: adminTheme.borderSoft,
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      color: adminTheme.brownMid,
+                    }}
+                  />
+                </View>
+
+                <View>
+                  <Text style={{ color: adminTheme.brown, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+                    Vai trò
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {ROLES.map((r) => (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setEditRole(r)}
+                        disabled={editBusy}
+                        className="rounded-full px-3 py-1.5"
+                        style={{
+                          backgroundColor: editRole === r ? adminTheme.brown : adminTheme.pillBg,
+                        }}>
+                        <Text
+                          style={{
+                            color: editRole === r ? '#fff' : adminTheme.brown,
+                            fontWeight: '700',
+                            fontSize: 12,
+                          }}>
+                          {ROLE_LABEL[r]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between">
+                  <Text style={{ color: adminTheme.brown, fontSize: 13, fontWeight: '700' }}>
+                    Xác minh
+                  </Text>
+                  <TouchableOpacity
+                    disabled={editBusy}
+                    onPress={() => setEditIsVerified((v) => !v)}
+                    style={{
+                      backgroundColor: editIsVerified ? adminTheme.teal : adminTheme.pillBg,
+                      borderRadius: 16,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                    }}>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+                      {editIsVerified ? 'Đã xác minh' : 'Chưa xác minh'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View className="flex-row gap-3 mt-2">
+                  <TouchableOpacity
+                    className="flex-1 items-center rounded-xl py-3"
+                    style={{ backgroundColor: adminTheme.brownMid, opacity: editBusy ? 0.7 : 1 }}
+                    disabled={editBusy}
+                    onPress={() => void saveEditUser()}>
+                    {editBusy ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={{ color: '#fff', fontWeight: '900' }}>Lưu thay đổi</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
           </View>
