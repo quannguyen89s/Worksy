@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import jobModel from "../models/job.model";
+import reviewModel from "../models/review.model";
 import applicationModel from "../models/application.model";
 import userModel from "../models/user.model";
 import { haversineKm } from "../utils/distance";
@@ -8,7 +9,21 @@ import {
   recommendationScore,
 } from "../utils/scoring";
 import { AppError } from "../utils/AppError";
-import { emitJobNearby } from "../sockets/emitters";
+import { emitJobCompleted, emitJobNearby } from "../sockets/emitters";
+
+type CompletionSource = "manual" | "auto";
+const DEFAULT_AUTO_DONE_HOURS = Math.max(
+  1,
+  Number(process.env.JOB_AUTO_DONE_AFTER_HOURS ?? 72),
+);
+
+function computeCompletionDueAt(hours: number) {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function jobPoint(job: { location?: { lat?: number; lng?: number } | null }) {
   return {
@@ -29,6 +44,105 @@ function syncJobStatus(doc: {
   } else {
     doc.status = "open";
   }
+}
+
+export type WorkerBrowseFilters = {
+  search?: string;
+  status?: string[];
+  minPrice?: number;
+  maxPrice?: number;
+  skillTags?: string[];
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  sort?: "price_asc" | "price_desc" | "date_desc" | "date_asc" | "distance";
+  page?: number;
+  limit?: number;
+};
+
+export async function listJobsForWorker(filters: WorkerBrowseFilters) {
+  const {
+    search,
+    status = ["open", "partial", "full"],
+    minPrice,
+    maxPrice,
+    skillTags,
+    lat,
+    lng,
+    radiusKm = 10,
+    sort = "date_desc",
+    page = 1,
+    limit = 20,
+  } = filters;
+
+  const query: Record<string, unknown> = {};
+
+  // Chỉ hiển thị job đang tuyển (không pending, không done)
+  query.status = { $in: status };
+
+  if (search?.trim()) {
+    const keyword = search.trim();
+    const regex = new RegExp(escapeRegex(keyword), "i");
+    query.$or = [
+      { title: regex },
+      { description: regex },
+      { skillTags: regex },
+    ];
+  }
+
+  if (minPrice != null && maxPrice != null && Number.isFinite(minPrice) && Number.isFinite(maxPrice)) {
+    query.price = { $gte: minPrice, $lte: maxPrice };
+  } else if (minPrice != null && Number.isFinite(minPrice)) {
+    query.price = { $gte: minPrice };
+  } else if (maxPrice != null && Number.isFinite(maxPrice)) {
+    query.price = { $lte: maxPrice };
+  }
+
+  if (skillTags?.length) {
+    const tags = skillTags.filter(Boolean).map((s) => s.trim());
+    if (tags.length) {
+      query.skillTags = { $in: tags };
+    }
+  }
+
+  let jobs = await jobModel.find(query).sort({ createdAt: -1 }).lean();
+
+  // Lọc theo khoảng cách nếu có lat, lng
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    const userPoint = { lat: lat!, lng: lng! };
+    jobs = jobs
+      .map((j) => {
+        const jl = jobPoint(j);
+        const distanceKm = haversineKm(userPoint, jl);
+        return { ...j, distanceKm };
+      })
+      .filter((j) => j.distanceKm <= radiusKm);
+  }
+
+  // Sort
+  if (sort === "price_asc") {
+    jobs.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+  } else if (sort === "price_desc") {
+    jobs.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+  } else if (sort === "date_asc") {
+    jobs.sort(
+      (a, b) =>
+        new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime(),
+    );
+  } else if (sort === "date_desc") {
+    jobs.sort(
+      (a, b) =>
+        new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+    );
+  } else if (sort === "distance" && Number.isFinite(lat) && Number.isFinite(lng)) {
+    jobs.sort((a, b) => ((a as { distanceKm?: number }).distanceKm ?? 999) - ((b as { distanceKm?: number }).distanceKm ?? 999));
+  }
+
+  const total = jobs.length;
+  const skip = Math.max(0, (page - 1) * limit);
+  const paginated = jobs.slice(skip, skip + limit);
+
+  return { data: paginated, total, page, limit };
 }
 
 export async function listJobsNearby(
@@ -63,15 +177,21 @@ export async function createJob(
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
   },
 ) {
+  const schedule = new Date(body.scheduledAt);
+  if (Number.isNaN(schedule.getTime())) {
+    throw new AppError("scheduledAt is invalid", 400);
+  }
   const job = await jobModel.create({
     title: body.title,
     description: body.description,
     price: body.price,
     location: body.location,
+    scheduledAt: schedule,
     requiredWorkers: body.requiredWorkers,
     skillTags: body.skillTags ?? [],
     createdBy: customerId,
@@ -86,11 +206,82 @@ export async function createJob(
   return job.toObject();
 }
 
+async function markJobDone(jobId: string, source: CompletionSource, customerId?: string) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const job = await jobModel.findById(jobId).session(session);
+    if (!job) throw new AppError("Job not found", 404);
+    if (customerId && String(job.createdBy) !== customerId) {
+      throw new AppError("Forbidden", 403);
+    }
+    if (job.status === "done") {
+      await session.commitTransaction();
+      return job.toObject();
+    }
+
+    const workerIds = job.assignedWorkerIds.map(String);
+    job.status = "done";
+    job.completedAt = new Date();
+    job.completionSource = source;
+    job.completionDueAt = null;
+    await job.save({ session });
+
+    if (workerIds.length > 0) {
+      await userModel.updateMany(
+        { _id: { $in: workerIds } },
+        { $inc: { completedJobs: 1 } },
+        { session },
+      );
+    }
+
+    await session.commitTransaction();
+    void emitJobCompleted(String(job._id), String(job.createdBy), workerIds, source);
+    return job.toObject();
+  } catch (e) {
+    await session.abortTransaction();
+    throw e;
+  } finally {
+    session.endSession();
+  }
+}
+
 export async function listMyJobs(customerId: string) {
-  return jobModel
+  const jobs = await jobModel
     .find({ createdBy: customerId, isDeleted: { $ne: true } })
+    .populate("assignedWorkerIds", "name email")
     .sort({ createdAt: -1 })
     .lean();
+
+  const doneIds = jobs
+    .filter(
+      (j) =>
+        j.status === "done" &&
+        Array.isArray(j.assignedWorkerIds) &&
+        j.assignedWorkerIds.length > 0,
+    )
+    .map((j) => j._id);
+
+  const countByJob = new Map<string, number>();
+  if (doneIds.length > 0) {
+    const counts = await reviewModel.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
+      { $match: { jobId: { $in: doneIds } } },
+      { $group: { _id: "$jobId", n: { $sum: 1 } } },
+    ]);
+    for (const row of counts) {
+      countByJob.set(String(row._id), row.n);
+    }
+  }
+
+  return jobs.map((j) => {
+    const nw = Array.isArray(j.assignedWorkerIds) ? j.assignedWorkerIds.length : 0;
+    let feedbackActionable = false;
+    if (j.status === "done" && nw > 0) {
+      const nr = countByJob.get(String(j._id)) ?? 0;
+      feedbackActionable = nr < nw;
+    }
+    return { ...j, feedbackActionable };
+  });
 }
 
 export async function listPendingJobs() {
@@ -245,6 +436,13 @@ export async function selectWorkers(
     job.assignedWorkerIds = [...job.assignedWorkerIds, ...added];
     job.assignedWorkers = job.assignedWorkerIds.length;
     syncJobStatus(job);
+    if (job.assignedWorkers > 0 && !job.completionDueAt) {
+      const autoDoneAfterHours = Math.max(
+        1,
+        job.autoDoneAfterHours ?? DEFAULT_AUTO_DONE_HOURS,
+      );
+      job.completionDueAt = computeCompletionDueAt(autoDoneAfterHours);
+    }
     await job.save({ session });
     await session.commitTransaction();
     return job.toObject();
@@ -278,6 +476,7 @@ export async function updateJob(
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
   },
@@ -301,6 +500,13 @@ export async function updateJob(
   }
   if (body.requiredWorkers !== undefined && body.requiredWorkers < 1) {
     throw new AppError("requiredWorkers must be >= 1", 400);
+  }
+  if (body.scheduledAt !== undefined) {
+    const schedule = new Date(body.scheduledAt);
+    if (Number.isNaN(schedule.getTime())) {
+      throw new AppError("scheduledAt is invalid", 400);
+    }
+    job.scheduledAt = schedule;
   }
   if (body.title !== undefined) job.title = body.title;
   if (body.description !== undefined) job.description = body.description;
@@ -349,6 +555,29 @@ export async function completeJob(jobId: string, customerId: string) {
       { _id: { $in: workerIds } },
       { $inc: { completedJobs: 1 } },
     );
+  return markJobDone(jobId, "manual", customerId);
+}
+}
+
+export async function completeOverdueJobs() {
+  const now = new Date();
+  const dueJobs = await jobModel
+    .find({
+      status: { $in: ["open", "partial", "full"] },
+      completionDueAt: { $ne: null, $lte: now },
+      assignedWorkers: { $gt: 0 },
+    })
+    .select("_id")
+    .lean();
+
+  let completed = 0;
+  for (const row of dueJobs) {
+    try {
+      await markJobDone(String(row._id), "auto");
+      completed += 1;
+    } catch (err) {
+      console.error("[job:auto-done] failed to complete job:", row._id, err);
+    }
   }
-  return job.toObject();
+  return { scanned: dueJobs.length, completed };
 }

@@ -8,23 +8,17 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import authService from '@/services/authService';
+import { COLORS } from '@/theme/colors';
+import type { RootStackParamList } from '@/navigation/types';
 
-const COLORS = {
-  bg: '#FFF8E7',
-  card: '#FFFFFF',
-  primary: '#92400E',
-  primaryLight: '#F5E6D3',
-  text: '#3F3F46',
-  textLight: '#71717A',
-  border: '#E4D5C3',
-  error: '#DC2626',
-  success: '#16A34A',
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,171 +69,110 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.bg }}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1"
+        style={styles.flex1}
       >
         <ScrollView
-          className="flex-1"
-          contentContainerClassName="flex-grow justify-center px-6 py-10"
+          style={styles.flex1}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Logo */}
-          <View className="items-center mb-10">
-            <Text className="text-4xl font-bold" style={{ color: COLORS.primary }}>
-              Worksy
-            </Text>
-            <Text className="text-base mt-2" style={{ color: COLORS.textLight }}>
-              Tạo tài khoản mới
-            </Text>
+          <View style={styles.hero}>
+            <Text style={styles.logo}>Worksy</Text>
+            <Text style={styles.subtitle}>Tạo tài khoản mới</Text>
           </View>
 
-          {/* Form Card */}
-          <View
-            className="rounded-2xl p-6"
-            style={{ backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border }}
-          >
-            {/* Error message */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Đăng ký</Text>
+            <Text style={styles.cardHint}>Điền thông tin để bắt đầu</Text>
+
             {errorMsg ? (
-              <View className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: '#FEE2E2' }}>
-                <Text className="text-sm" style={{ color: COLORS.error }}>{errorMsg}</Text>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
             ) : null}
 
-            {/* Success message */}
             {successMsg ? (
-              <View className="rounded-xl px-4 py-3 mb-4" style={{ backgroundColor: '#DCFCE7' }}>
-                <Text className="text-sm" style={{ color: COLORS.success }}>{successMsg}</Text>
-                <TouchableOpacity className="mt-2" onPress={() => navigation.navigate('Login')}>
-                  <Text className="text-sm font-semibold" style={{ color: COLORS.primary }}>
-                    ← Về trang đăng nhập
-                  </Text>
+              <View style={styles.successBox}>
+                <Text style={styles.successText}>{successMsg}</Text>
+                <TouchableOpacity style={styles.successLink} onPress={() => navigation.navigate('Login')}>
+                  <Text style={styles.successLinkText}>← Về trang đăng nhập</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
-            {/* Name */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Họ và tên
-            </Text>
+            <Text style={styles.label}>Họ và tên</Text>
             <TextInput
-              className="rounded-xl px-4 py-3 text-base mb-4"
-              style={{
-                backgroundColor: COLORS.primaryLight,
-                color: COLORS.text,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-              placeholder="Nhập họ và tên"
-              placeholderTextColor={COLORS.textLight}
+              style={styles.input}
+              placeholder="Nguyễn Văn A"
+              placeholderTextColor={COLORS.textMuted}
               value={name}
-              onChangeText={(text) => { setName(text); clearError(); }}
+              onChangeText={(t) => { setName(t); clearError(); }}
             />
 
-            {/* Email */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Email
-            </Text>
+            <Text style={styles.label}>Email</Text>
             <TextInput
-              className="rounded-xl px-4 py-3 text-base mb-4"
-              style={{
-                backgroundColor: COLORS.primaryLight,
-                color: COLORS.text,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-              }}
-              placeholder="Nhập email của bạn"
-              placeholderTextColor={COLORS.textLight}
+              style={styles.input}
+              placeholder="your@email.com"
+              placeholderTextColor={COLORS.textMuted}
               value={email}
-              onChangeText={(text) => { setEmail(text); clearError(); }}
+              onChangeText={(t) => { setEmail(t); clearError(); }}
               keyboardType="email-address"
               autoCapitalize="none"
             />
 
-            {/* Password */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Mật khẩu
-            </Text>
-            <View className="relative mb-4">
+            <Text style={styles.label}>Mật khẩu</Text>
+            <Text style={styles.hint}>Tối thiểu 6 ký tự, có chữ hoa và số</Text>
+            <View style={styles.passwordWrap}>
               <TextInput
-                className="rounded-xl px-4 py-3 text-base pr-16"
-                style={{
-                  backgroundColor: COLORS.primaryLight,
-                  color: COLORS.text,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                }}
-                placeholder="Tối thiểu 6 ký tự, có chữ hoa và số"
-                placeholderTextColor={COLORS.textLight}
+                style={styles.inputPassword}
+                placeholder="••••••••"
+                placeholderTextColor={COLORS.textMuted}
                 value={password}
-                onChangeText={(text) => { setPassword(text); clearError(); }}
+                onChangeText={(t) => { setPassword(t); clearError(); }}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3"
-                onPress={() => setShowPassword(!showPassword)}
-              >
-                <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                  {showPassword ? 'Ẩn' : 'Hiện'}
-                </Text>
+              <TouchableOpacity style={styles.togglePass} onPress={() => setShowPassword(!showPassword)}>
+                <Text style={styles.togglePassText}>{showPassword ? 'Ẩn' : 'Hiện'}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Confirm Password */}
-            <Text className="text-sm font-medium mb-2" style={{ color: COLORS.text }}>
-              Xác nhận mật khẩu
-            </Text>
-            <View className="relative mb-6">
+            <Text style={styles.label}>Xác nhận mật khẩu</Text>
+            <View style={styles.passwordWrap}>
               <TextInput
-                className="rounded-xl px-4 py-3 text-base pr-16"
-                style={{
-                  backgroundColor: COLORS.primaryLight,
-                  color: COLORS.text,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                }}
-                placeholder="Nhập lại mật khẩu"
-                placeholderTextColor={COLORS.textLight}
+                style={styles.inputPassword}
+                placeholder="••••••••"
+                placeholderTextColor={COLORS.textMuted}
                 value={confirmPassword}
-                onChangeText={(text) => { setConfirmPassword(text); clearError(); }}
+                onChangeText={(t) => { setConfirmPassword(t); clearError(); }}
                 secureTextEntry={!showConfirmPassword}
               />
-              <TouchableOpacity
-                className="absolute right-3 top-3"
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <Text className="text-sm font-medium" style={{ color: COLORS.primary }}>
-                  {showConfirmPassword ? 'Ẩn' : 'Hiện'}
-                </Text>
+              <TouchableOpacity style={styles.togglePass} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                <Text style={styles.togglePassText}>{showConfirmPassword ? 'Ẩn' : 'Hiện'}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Register Button */}
             <TouchableOpacity
-              className="rounded-xl py-4 items-center"
-              style={{ backgroundColor: loading ? '#B45309' : COLORS.primary }}
+              style={[styles.btnPrimary, loading && styles.btnPrimaryDisabled]}
               onPress={handleRegister}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text className="text-white text-base font-semibold">Đăng ký</Text>
+                <Text style={styles.btnPrimaryText}>Đăng ký</Text>
               )}
             </TouchableOpacity>
           </View>
 
-          {/* Login Link */}
-          <View className="flex-row justify-center mt-6">
-            <Text className="text-sm" style={{ color: COLORS.textLight }}>
-              Đã có tài khoản?{' '}
-            </Text>
+          <View style={styles.loginRow}>
+            <Text style={styles.loginText}>Đã có tài khoản? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text className="text-sm font-semibold" style={{ color: COLORS.primary }}>
-                Đăng nhập
-              </Text>
+              <Text style={styles.loginLink}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -247,3 +180,90 @@ export default function RegisterScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  flex1: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 24, paddingBottom: 48 },
+  hero: { alignItems: 'center', marginBottom: 28 },
+  logo: { fontSize: 38, fontWeight: '800', color: COLORS.primary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, color: COLORS.textSecondary, marginTop: 6 },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  cardTitle: { fontSize: 22, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  cardHint: { fontSize: 14, color: COLORS.textMuted, marginBottom: 20 },
+  errorBox: {
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.error,
+  },
+  errorText: { fontSize: 14, color: COLORS.error, fontWeight: '500' },
+  successBox: {
+    backgroundColor: COLORS.successLight,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.success,
+  },
+  successText: { fontSize: 14, color: COLORS.success, fontWeight: '500' },
+  successLink: { marginTop: 8 },
+  successLinkText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
+  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 8 },
+  hint: { fontSize: 12, color: COLORS.textMuted, marginBottom: 6 },
+  input: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 16,
+  },
+  passwordWrap: { position: 'relative', marginBottom: 16 },
+  inputPassword: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    paddingRight: 72,
+    fontSize: 16,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  togglePass: { position: 'absolute', right: 16, top: 14 },
+  togglePassText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
+  btnPrimary: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 8,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  btnPrimaryDisabled: { opacity: 0.85 },
+  btnPrimaryText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  loginText: { fontSize: 15, color: COLORS.textMuted },
+  loginLink: { fontSize: 15, fontWeight: '700', color: COLORS.primary },
+});

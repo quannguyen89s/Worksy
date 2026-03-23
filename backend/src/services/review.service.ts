@@ -1,7 +1,32 @@
+import mongoose from "mongoose";
 import jobModel from "../models/job.model";
 import reviewModel from "../models/review.model";
 import userModel from "../models/user.model";
 import { AppError } from "../utils/AppError";
+
+function assertValidJobId(jobId: string) {
+  if (!jobId || !mongoose.Types.ObjectId.isValid(jobId)) {
+    throw new AppError("Job not found", 404);
+  }
+}
+
+export async function listReviewsForCustomerJob(
+  customerId: string,
+  jobId: string,
+) {
+  assertValidJobId(jobId);
+  const job = await jobModel.findById(jobId).lean();
+  if (!job) throw new AppError("Job not found", 404);
+  if (job.isDeleted) throw new AppError("Job not found", 404);
+  if (String(job.createdBy) !== customerId) {
+    throw new AppError("Forbidden", 403);
+  }
+  return reviewModel
+    .find({ jobId })
+    .select("workerId rating comment createdAt")
+    .sort({ createdAt: -1 })
+    .lean();
+}
 
 export async function createReview(
   customerId: string,
@@ -12,6 +37,10 @@ export async function createReview(
     comment?: string;
   },
 ) {
+  assertValidJobId(body.jobId);
+  if (!body.workerId || !mongoose.Types.ObjectId.isValid(body.workerId)) {
+    throw new AppError("Invalid worker", 400);
+  }
   const job = await jobModel.findById(body.jobId).lean();
   if (!job) throw new AppError("Job not found", 404);
   if (job.status !== "done") {
