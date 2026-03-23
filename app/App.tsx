@@ -11,6 +11,7 @@ import RegisterScreen from '@/components/authScreens/RegisterScreen';
 import MyJobsScreen from '@/screens/MyJobsScreen';
 import BrowseJobsScreen from '@/screens/BrowseJobsScreen';
 import WorkerAppliesScreen from '@/screens/WorkerAppliesScreen';
+import NotificationsScreen from '@/screens/NotificationsScreen';
 import AdminDashboardScreen from '@/screens/admin/AdminDashboardScreen';
 import AdminUsersScreen from '@/screens/admin/AdminUsersScreen';
 import AdminJobsScreen from '@/screens/admin/AdminJobsScreen';
@@ -70,6 +71,11 @@ export default function App() {
           <Stack.Screen
             name="WorkerApplies"
             component={WorkerAppliesScreen}
+            options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
             options={{ cardStyleInterpolator: CardStyleInterpolators.forNoAnimation }}
           />
         </Stack.Navigator>

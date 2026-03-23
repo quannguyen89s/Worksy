@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
@@ -11,11 +11,32 @@ import authService from '@/services/authService';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { decodeJwtRole } from '@/api/adminApi';
+
+type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
 
 export default function HomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [role, setRole] = useState<UserRole>('guest');
+
+  useFocusEffect(
+    useCallback(() => {
+      void SecureStore.getItemAsync('accessToken').then((token) => {
+        if (!token) {
+          setRole('guest');
+          return;
+        }
+        const decoded = decodeJwtRole(token);
+        if (decoded === 'customer' || decoded === 'worker' || decoded === 'admin') {
+          setRole(decoded);
+        } else {
+          setRole('guest');
+        }
+      });
+    }, []),
+  );
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -41,7 +62,7 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
       <UserHeader
         title="Worksy"
-        subtitle="Chào mừng bạn trở lại"
+        subtitle={role === 'customer' ? 'Không gian khách hàng' : 'Không gian người lao động'}
         leftIcon="menu"
         onLeftPress={() => {}}
         rightLabel={loggingOut ? 'Đang thoát...' : 'Đăng xuất'}
@@ -60,30 +81,53 @@ export default function HomeScreen() {
               <Ionicons name="search-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Tìm việc</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('MyJobs')}
-            >
-              <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Đăng tin</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('MyJobs')}
-            >
-              <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Tin của tôi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              activeOpacity={0.85}
-              onPress={() => navigation.navigate('WorkerApplies')}
-            >
-              <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
-              <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
-            </TouchableOpacity>
+            {role === 'customer' ? (
+              <>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MyJobs')}
+                >
+                  <Ionicons name="create-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Đăng tin</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('MyJobs')}
+                >
+                  <Ionicons name="briefcase-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Tin của tôi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Notifications')}
+                >
+                  <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Thông báo</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('WorkerApplies')}
+                >
+                  <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('Notifications')}
+                >
+                  <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
+                  <Text style={styles.actionBtnText}>Thông báo</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
@@ -91,21 +135,29 @@ export default function HomeScreen() {
           <Text style={styles.cardTitle}>Tổng quan</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Việc đã xem</Text>
+              <Text style={styles.statLabel}>
+                {role === 'customer' ? 'Tin đã đăng' : 'Đơn đã ứng tuyển'}
+              </Text>
               <Text style={styles.statValue}>0</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Tin đã đăng</Text>
+              <Text style={styles.statLabel}>
+                {role === 'customer' ? 'Tin đang mở' : 'Việc đang làm'}
+              </Text>
               <Text style={styles.statValue}>0</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
+          <Text style={styles.cardTitle}>
+            {role === 'customer' ? 'Tin mới nhất' : 'Danh sách ứng tuyển đã làm'}
+          </Text>
           <View style={styles.emptyBox}>
             <Ionicons name="pricetag-outline" size={34} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
+            <Text style={styles.emptyText}>
+              {role === 'customer' ? 'Chưa có tin nào' : 'Chưa có lịch sử ứng tuyển'}
+            </Text>
           </View>
         </View>
       </ScrollView>

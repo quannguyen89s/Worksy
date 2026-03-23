@@ -5,11 +5,16 @@ import type { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { ComponentProps } from 'react';
+import { useCallback, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { decodeJwtRole } from '@/api/adminApi';
+import { useFocusEffect } from '@react-navigation/native';
 
 type UserRoute = keyof Pick<
   RootStackParamList,
-  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies'
+  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies' | 'Notifications'
 >;
+type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -18,6 +23,7 @@ const ICONS: Record<UserRoute, IconName> = {
   BrowseJobs: 'search-outline',
   MyJobs: 'briefcase-outline',
   WorkerApplies: 'document-text-outline',
+  Notifications: 'notifications-outline',
 };
 
 const LABELS: Record<UserRoute, string> = {
@@ -25,6 +31,7 @@ const LABELS: Record<UserRoute, string> = {
   BrowseJobs: 'TÌM VIỆC',
   MyJobs: 'TIN CỦA TÔI',
   WorkerApplies: 'ĐÃ ỨNG TUYỂN',
+  Notifications: 'THÔNG BÁO',
 };
 
 const TAB_H = 58;
@@ -37,10 +44,31 @@ export default function UserBottomBar({
   active: UserRoute;
 }) {
   const insets = useSafeAreaInsets();
+  const [role, setRole] = useState<UserRole>('guest');
   const bottomPad = Math.max(insets.bottom, 10);
   const height = TAB_H + bottomPad;
 
-  const routes: UserRoute[] = ['Home', 'BrowseJobs', 'MyJobs', 'WorkerApplies'];
+  useFocusEffect(
+    useCallback(() => {
+      void SecureStore.getItemAsync('accessToken').then((token) => {
+        if (!token) {
+          setRole('guest');
+          return;
+        }
+        const decoded = decodeJwtRole(token);
+        if (decoded === 'customer' || decoded === 'worker' || decoded === 'admin') {
+          setRole(decoded);
+        } else {
+          setRole('guest');
+        }
+      });
+    }, []),
+  );
+
+  const routes: UserRoute[] =
+    role === 'customer'
+      ? ['Home', 'MyJobs', 'BrowseJobs', 'Notifications']
+      : ['Home', 'BrowseJobs', 'WorkerApplies', 'Notifications'];
 
   return (
     <View

@@ -5,6 +5,7 @@ export type RootStackParamList = {
   BrowseJobs: undefined;
   MyJobs: undefined;
   WorkerApplies: undefined;
+  Notifications: undefined;
   AdminDashboard: undefined;
   AdminUsers: undefined;
   AdminJobs: undefined;
