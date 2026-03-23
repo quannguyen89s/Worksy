@@ -29,7 +29,7 @@ export const createConversationController = async (req: Request, res: Response) 
       return;
     }
 
-    const conversation = await chatService.getOrCreateConversation(
+    const { conversation } = await chatService.getOrCreateConversation(
       req.user!.id,
       recipientId,
       jobId

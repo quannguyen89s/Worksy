@@ -1,6 +1,5 @@
 import cors from "cors";
 import express, { json, Request, Response, urlencoded } from "express";
-import connectDB from "./config/db";
 import { getCorsOptions } from "./config/corsOptions";
 import { errorHandler } from "./middlewares/error.middlewares";
 
@@ -9,7 +8,6 @@ import applyRouter from "./routes/apply.route";
 import jobRouter from "./routes/job.route";
 import reviewRouter from "./routes/review.route";
 import adminRouter from "./routes/admin.route";
-import { errorHandler } from "./middlewares/error.middlewares";
 import chatRouter from "./routes/chat.routes";
 import notificationRouter from "./routes/notification.routes";
 import userRouter from "./routes/user.routes";

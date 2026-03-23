@@ -9,12 +9,13 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import type { Socket } from 'socket.io-client';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
+import UserBottomBar from '../components/navigation/UserBottomBar';
 import { getConversations } from '../services/chat.service';
 import { getStoredUser } from '../services/authService';
 import { connectSocket } from '../services/socket';
@@ -42,6 +43,7 @@ function extractId(obj: unknown): string {
 
 
 export default function MessagesScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filtered, setFiltered] = useState<Conversation[]>([]);
   const [query, setQuery] = useState('');
@@ -159,7 +161,9 @@ export default function MessagesScreen({ navigation }: Props) {
 
   const getLastMessage = (conv: Conversation): string => {
     if (!conv.lastMessage) return 'Bắt đầu cuộc trò chuyện...';
+    if (conv.lastMessage.type === 'image') return 'Da gui 1 anh';
     const content = conv.lastMessage.content ?? '';
+    if (content.startsWith('data:image/')) return 'Da gui 1 anh';
     return content.length > 50 ? content.slice(0, 50) + '...' : content;
   };
 
@@ -212,6 +216,11 @@ export default function MessagesScreen({ navigation }: Props) {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => (navigation as any).navigate('Home')}>
+            <Ionicons name="home-outline" size={22} color="#6A5A4A" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="search" size={22} color="#6A5A4A" />
           </TouchableOpacity>
@@ -247,6 +256,7 @@ export default function MessagesScreen({ navigation }: Props) {
           data={filtered}
           keyExtractor={(item) => item._id}
           renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 10) + 92 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C87941" />
           }
@@ -257,6 +267,7 @@ export default function MessagesScreen({ navigation }: Props) {
           }
         />
       )}
+      <UserBottomBar navigation={navigation} active="Messages" />
     </SafeAreaView>
   );
 }

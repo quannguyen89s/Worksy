@@ -37,17 +37,7 @@ async function start() {
   startAutoDoneScheduler();
   httpServer.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
-    const _listen = app.listen.bind(app);
-    app.listen = ((...args: Parameters<typeof app.listen>) => {
-      const server = _listen(...args);
-      initSocket(server);
-      return server;
-    }) as typeof app.listen;
+  });
+}
 
-    const PORT = process.env.PORT;
-
-    connectDB().then(() => {
-      app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`);
-      });
-    });
+start();

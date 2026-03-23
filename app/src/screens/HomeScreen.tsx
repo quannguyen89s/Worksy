@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '@/theme/colors';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
 import authService from '@/services/authService';
+import { getUnreadCount as getNotificationUnreadCount } from '@/services/notification.service';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,26 @@ export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  const handleOpenMessages = () => navigation.navigate('Messages');
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadUnread = async () => {
+        try {
+          const count = await getNotificationUnreadCount();
+          if (active) setNotificationUnreadCount(count);
+        } catch {
+          // Keep previous value if unread API is unavailable.
+        }
+      };
+      void loadUnread();
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -83,6 +104,23 @@ export default function HomeScreen() {
             >
               <Ionicons name="document-text-outline" size={24} color={COLORS.primaryDark} />
               <Text style={styles.actionBtnText}>Đã ứng tuyển</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <View style={styles.actionIconWrap}>
+                <Ionicons name="notifications-outline" size={24} color={COLORS.primaryDark} />
+                {notificationUnreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {notificationUnreadCount > 9 ? '9+' : String(notificationUnreadCount)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.actionBtnText}>Thông báo</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -173,6 +211,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 83, 9, 0.15)',
   },
   actionBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: 14 },
+  actionIconWrap: {
+    position: 'relative',
+    marginBottom: 2,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -12,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: COLORS.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
   statsRow: { flexDirection: 'row', gap: 14 },
   statBox: {
     flex: 1,

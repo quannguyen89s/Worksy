@@ -114,7 +114,7 @@ export default function NotificationsScreen() {
     if (item.type === 'new_message') {
       const convId = item.data['conversationId'] as string | undefined;
       if (!convId) {
-        navigation.navigate('ChatTab');
+        navigation.navigate('Messages');
         return;
       }
 
@@ -136,12 +136,9 @@ export default function NotificationsScreen() {
           recipientId = String(recipient?._id ?? recipient?.id ?? '');
         }
 
-        navigation.navigate('ChatTab', {
-          screen: 'Chat',
-          params: { conversationId: convId, recipientName, recipientId },
-        });
+        navigation.navigate('Chat', { conversationId: convId, recipientName, recipientId });
       } catch {
-        navigation.navigate('ChatTab');
+        navigation.navigate('Messages');
       } finally {
         setNavigating(null);
       }
@@ -190,12 +187,17 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thông báo</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAll}>
-            <Text style={styles.readAll}>Đọc tất cả</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Home')}>
+            <Ionicons name="home-outline" size={20} color="#6A5A4A" />
           </TouchableOpacity>
-        )}
+          {unreadCount > 0 && (
+            <TouchableOpacity onPress={handleMarkAll}>
+              <Text style={styles.readAll}>Đọc tất cả</Text>
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
 
       {loading ? (
         <ActivityIndicator color="#C87941" style={{ marginTop: 40 }} />
@@ -242,6 +244,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1A0F0A',
     letterSpacing: -0.5,
+  },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconBtn: {
+    padding: 8,
+    backgroundColor: '#E8DDD2',
+    borderRadius: 12,
   },
   readAll: {
     fontSize: 13,

@@ -8,7 +8,7 @@ import type { ComponentProps } from 'react';
 
 type UserRoute = keyof Pick<
   RootStackParamList,
-  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies'
+  'Home' | 'BrowseJobs' | 'MyJobs' | 'WorkerApplies' | 'Messages'
 >;
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -18,6 +18,7 @@ const ICONS: Record<UserRoute, IconName> = {
   BrowseJobs: 'search-outline',
   MyJobs: 'briefcase-outline',
   WorkerApplies: 'document-text-outline',
+  Messages: 'chatbubble-ellipses-outline',
 };
 
 const LABELS: Record<UserRoute, string> = {
@@ -25,6 +26,7 @@ const LABELS: Record<UserRoute, string> = {
   BrowseJobs: 'TÌM VIỆC',
   MyJobs: 'TIN CỦA TÔI',
   WorkerApplies: 'ĐÃ ỨNG TUYỂN',
+  Messages: 'TIN NHẮN',
 };
 
 const TAB_H = 58;
@@ -40,7 +42,7 @@ export default function UserBottomBar({
   const bottomPad = Math.max(insets.bottom, 10);
   const height = TAB_H + bottomPad;
 
-  const routes: UserRoute[] = ['Home', 'BrowseJobs', 'MyJobs', 'WorkerApplies'];
+  const routes: UserRoute[] = ['Home', 'BrowseJobs', 'MyJobs', 'WorkerApplies', 'Messages'];
 
   return (
     <View
