@@ -5,6 +5,15 @@ import { LoginRequestBody, RegisterRequestBody, VerifyEmailRequestBody, ForgotPa
 import { ParamsDictionary } from "express-serve-static-core";
 import HTTP_STATUS from "../constants/httpStatus";
 import USER_MESSAGE from "../constants/userMessage";
+import { AppError } from "../utils/AppError";
+
+const handleError = (error: unknown, res: Response) => {
+    console.log(error);
+    if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+    }
+    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+}
 
 export const loginController = async (req: Request<ParamsDictionary, any, LoginRequestBody>, res: Response) => {
     try {
@@ -12,8 +21,7 @@ export const loginController = async (req: Request<ParamsDictionary, any, LoginR
         const result = await loginService(email, password);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -23,8 +31,7 @@ export const logoutController = async (req: Request, res: Response) => {
         const result = await logoutService(user._id);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -37,8 +44,7 @@ export const googleLoginController = async (req: Request, res: Response) => {
         const result = await googleLoginService(idToken);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -46,10 +52,9 @@ export const registerController = async (req: Request<ParamsDictionary, any, Reg
     try {
         const { name, email, password, confirm_password } = req.body;
         const result = await registerService(name, email, password, confirm_password);
-        return res.status(HTTP_STATUS.OK).json(result);
+        return res.status(HTTP_STATUS.CREATED).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -59,8 +64,7 @@ export const verifyEmailController = async (req: Request<ParamsDictionary, any, 
         const result = await verifyEmailService(emailVerifyToken);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -70,8 +74,7 @@ export const resendVerifyEmailController = async (req: Request, res: Response) =
         const result = await resendVerifyEmailService(email);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -123,8 +126,7 @@ export const forgotPasswordController = async (req: Request<ParamsDictionary, an
         const result = await forgotPasswordService(email);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -134,8 +136,7 @@ export const verifyForgotPasswordOTPController = async (req: Request<ParamsDicti
         const result = await verifyForgotPasswordOTPService(email, otp);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }
 
@@ -145,7 +146,6 @@ export const resetPasswordController = async (req: Request<ParamsDictionary, any
         const result = await resetPasswordService(email, otp, password);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
-        console.log(error);
-        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+        return handleError(error, res);
     }
 }

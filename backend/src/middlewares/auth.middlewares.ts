@@ -55,14 +55,6 @@ export const loginValidator = validate(checkSchema({
         notEmpty: {
             errorMessage: USER_MESSAGE.PASSWORD_REQUIRED,
         },
-        isLength: {
-            options: { min: 6 },
-            errorMessage: USER_MESSAGE.PASSWORD_MIN_LENGTH,
-        },
-        matches: {
-            options: /[A-Z]/,
-            errorMessage: USER_MESSAGE.PASSWORD_UPPERCASE,
-        },
     },
 }, ["body"]));
 

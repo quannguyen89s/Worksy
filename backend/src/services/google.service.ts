@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { ObjectId } from "mongodb";
 import { signAccessToken, signRefreshToken } from "../utils/jwt";
 import USER_MESSAGE from "../constants/userMessage";
+import HTTP_STATUS from "../constants/httpStatus";
+import { AppError } from "../utils/AppError";
 
 export const googleLoginService = async (idToken: string) => {
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -15,7 +17,7 @@ export const googleLoginService = async (idToken: string) => {
 
     const payload = ticket.getPayload();
     if (!payload || !payload.email) {
-        throw new Error("Invalid Google token");
+        throw new AppError("Invalid Google token", HTTP_STATUS.UNAUTHORIZED);
     }
 
     const { sub: googleId, email, name, picture } = payload;

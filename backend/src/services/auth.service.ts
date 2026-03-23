@@ -3,9 +3,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
+import HTTP_STATUS from "../constants/httpStatus";
 import { sendVerifyEmail, sendForgotPasswordEmail } from "./email.service";
 import { signAccessToken, signRefreshToken, signEmailVerifyToken } from "../utils/jwt";
-
+import { AppError } from "../utils/AppError";
 
 const generateOTP = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -14,14 +15,14 @@ const generateOTP = (): string => {
 export const loginService = async (email: string, password: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        return { message: USER_MESSAGE.INVALID_PASSWORD };
+        throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
     }
     if (!user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_NOT_VERIFIED };
+        throw new AppError(USER_MESSAGE.EMAIL_NOT_VERIFIED, HTTP_STATUS.FORBIDDEN);
     }
     const [accessToken, refreshToken] = await Promise.all([
         signAccessToken(user._id.toString(), user.role),
@@ -36,10 +37,10 @@ export const loginService = async (email: string, password: string) => {
 export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {
     const user = await userModel.findOne({ email });
     if (user) {
-        return { message: USER_MESSAGE.USER_ALREADY_EXISTS };
+        throw new AppError(USER_MESSAGE.USER_ALREADY_EXISTS, HTTP_STATUS.UNPROCESSABLE_ENTITY);
     }
     if (password !== confirm_password) {
-        return { message: USER_MESSAGE.PASSWORD_NOT_MATCH };
+        throw new AppError(USER_MESSAGE.PASSWORD_NOT_MATCH, HTTP_STATUS.BAD_REQUEST);
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const user_id = new ObjectId()
@@ -57,13 +58,13 @@ export const verifyEmailService = async (emailVerifyToken: string) => {
 
     const user = await userModel.findById(decoded._id);
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_ALREADY_VERIFIED };
+        throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
     }
     if (user.emailVerifyToken !== emailVerifyToken) {
-        return { message: USER_MESSAGE.INVALID_EMAIL_VERIFY_TOKEN };
+        throw new AppError(USER_MESSAGE.INVALID_EMAIL_VERIFY_TOKEN, HTTP_STATUS.BAD_REQUEST);
     }
 
     await userModel.updateOne({ _id: decoded._id }, { isVerified: true, emailVerifyToken: "" });
@@ -74,10 +75,10 @@ export const verifyEmailService = async (emailVerifyToken: string) => {
 export const resendVerifyEmailService = async (email: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        return { message: USER_MESSAGE.USER_NOT_FOUND };
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (user.isVerified) {
-        return { message: USER_MESSAGE.EMAIL_ALREADY_VERIFIED };
+        throw new AppError(USER_MESSAGE.EMAIL_ALREADY_VERIFIED, HTTP_STATUS.BAD_REQUEST);
     }
 
     const emailVerifyToken = await signEmailVerifyToken(user._id.toString());
@@ -91,7 +92,7 @@ export const resendVerifyEmailService = async (email: string) => {
 export const forgotPasswordService = async (email: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
 
     const otp = generateOTP();
@@ -110,13 +111,13 @@ export const forgotPasswordService = async (email: string) => {
 export const verifyForgotPasswordOTPService = async (email: string, otp: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
-    }
-    if (user.forgotPasswordOTP !== otp) {
-        throw new Error(USER_MESSAGE.INVALID_OTP);
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
-        throw new Error(USER_MESSAGE.OTP_EXPIRED);
+        throw new AppError(USER_MESSAGE.OTP_EXPIRED, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (user.forgotPasswordOTP !== otp) {
+        throw new AppError(USER_MESSAGE.INVALID_OTP, HTTP_STATUS.BAD_REQUEST);
     }
 
     return { message: USER_MESSAGE.VERIFY_OTP_SUCCESSFUL };
@@ -125,13 +126,13 @@ export const verifyForgotPasswordOTPService = async (email: string, otp: string)
 export const resetPasswordService = async (email: string, otp: string, password: string) => {
     const user = await userModel.findOne({ email });
     if (!user) {
-        throw new Error(USER_MESSAGE.USER_NOT_FOUND);
-    }
-    if (user.forgotPasswordOTP !== otp) {
-        throw new Error(USER_MESSAGE.INVALID_OTP);
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
     }
     if (!user.forgotPasswordOTPExpiry || user.forgotPasswordOTPExpiry < new Date()) {
-        throw new Error(USER_MESSAGE.OTP_EXPIRED);
+        throw new AppError(USER_MESSAGE.OTP_EXPIRED, HTTP_STATUS.BAD_REQUEST);
+    }
+    if (user.forgotPasswordOTP !== otp) {
+        throw new AppError(USER_MESSAGE.INVALID_OTP, HTTP_STATUS.BAD_REQUEST);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -147,5 +148,3 @@ export const logoutService = async (userId: string) => {
     await userModel.updateOne({ _id: userId }, { refreshToken: "" });
     return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
 }
-
-
