@@ -28,6 +28,7 @@ export async function createApply(
   if (job.status !== "open") {
     throw new AppError("Cannot apply to this job", 400);
   }
+
   const activeApplies = await applicationModel
     .find({
       workerId,
@@ -43,6 +44,7 @@ export async function createApply(
       throw new AppError("You already have another job application at this time", 409);
     }
   }
+
   try {
     const doc = await applicationModel.create({
       jobId: body.jobId,

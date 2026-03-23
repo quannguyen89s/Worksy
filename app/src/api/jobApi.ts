@@ -13,7 +13,7 @@ function getErrorMessage(err: unknown): string {
     }
     if ('message' in err) return String((err as { message: string }).message);
   }
-  return 'Có lỗi xảy ra. Kiểm tra: 1) Token đúng chưa 2) Backend có chạy ở port 3000 3) Nếu dùng thiết bị thật, đổi IP trong api/config.ts';
+  return 'Có lỗi xảy ra. Kiểm tra: 1) Token 2) Backend chạy port 3000 3) app/.env: EXPO_PUBLIC_API_URL=http://IP-PC:3000 rồi npx expo start -c';
 }
 
 export type JobCreateBody = {
@@ -36,6 +36,12 @@ export type JobUpdateBody = {
   skillTags?: string[];
 };
 
+export type AssignedWorkerRef = {
+  _id: string;
+  name?: string;
+  email?: string;
+};
+
 export type Job = {
   _id: string;
   title: string;
@@ -45,6 +51,8 @@ export type Job = {
   scheduledAt?: string;
   requiredWorkers: number;
   assignedWorkers: number;
+  /** ObjectId hoặc đã populate (sau khi list mine) */
+  assignedWorkerIds?: string[] | AssignedWorkerRef[];
   skillTags?: string[];
   status: string;
   createdBy: string;
@@ -54,6 +62,16 @@ export type Job = {
   completionDueAt?: string | null;
   completionSource?: 'manual' | 'auto' | null;
   autoDoneAfterHours?: number | null;
+  /** Backend list mine: còn thợ chưa có review → true (nút Đánh giá sáng). */
+  feedbackActionable?: boolean;
+};
+
+export type JobReviewRow = {
+  _id: string;
+  workerId: string;
+  rating: number;
+  comment?: string;
+  createdAt?: string;
 };
 
 export type BrowseJobsParams = {
@@ -192,6 +210,69 @@ export async function completeJob(accessToken: string, jobId: string): Promise<J
     },
   );
   return data.data;
+}
+
+export async function listJobReviews(
+  accessToken: string,
+  jobId: string,
+): Promise<JobReviewRow[]> {
+  const { data } = await axios.get(`${API_BASE}/review/job/${jobId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  const rows = Array.isArray(data.data) ? data.data : [];
+  return rows.map((r: Record<string, unknown>) => {
+    const wid = r.workerId as { _id?: string } | string | undefined;
+    const workerId =
+      typeof wid === 'object' && wid && '_id' in wid
+        ? String((wid as { _id: string })._id)
+        : String(wid ?? '');
+    return {
+      _id: String(r._id ?? ''),
+      workerId,
+      rating: Number(r.rating) || 0,
+      ...(typeof r.comment === 'string' && r.comment ? { comment: r.comment } : {}),
+      ...(typeof r.createdAt === 'string' ? { createdAt: r.createdAt } : {}),
+    };
+  });
+}
+
+export async function createJobReview(
+  accessToken: string,
+  body: { jobId: string; workerId: string; rating: number; comment?: string },
+): Promise<JobReviewRow> {
+  const { jobId, workerId, rating, comment } = body;
+  const { data } = await axios.post(
+    `${API_BASE}/review`,
+    {
+      jobId,
+      workerId,
+      rating,
+      ...(comment !== undefined && comment !== '' ? { comment } : {}),
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    },
+  );
+  const r = data.data as Record<string, unknown>;
+  const wid = r?.workerId;
+  const workerIdStr =
+    typeof wid === 'string'
+      ? wid
+      : typeof wid === 'object' && wid && wid !== null && '_id' in wid
+        ? String((wid as { _id?: unknown })._id)
+        : String(wid ?? '');
+  return {
+    _id: String(r?._id ?? ''),
+    workerId: workerIdStr,
+    rating: Number(r?.rating) || 0,
+    ...(typeof r?.comment === 'string' ? { comment: r.comment } : {}),
+    ...(typeof r?.createdAt === 'string' ? { createdAt: r.createdAt } : {}),
+  };
 }
 
 export async function applyJob(

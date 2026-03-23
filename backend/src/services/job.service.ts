@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import jobModel from "../models/job.model";
+import reviewModel from "../models/review.model";
 import applicationModel from "../models/application.model";
 import userModel from "../models/user.model";
 import { haversineKm } from "../utils/distance";
@@ -283,10 +284,41 @@ async function markJobDone(jobId: string, source: CompletionSource, customerId?:
 }
 
 export async function listMyJobs(customerId: string) {
-  return jobModel
+  const jobs = await jobModel
     .find({ createdBy: customerId, isDeleted: { $ne: true } })
+    .populate("assignedWorkerIds", "name email")
     .sort({ createdAt: -1 })
     .lean();
+
+  const doneIds = jobs
+    .filter(
+      (j) =>
+        j.status === "done" &&
+        Array.isArray(j.assignedWorkerIds) &&
+        j.assignedWorkerIds.length > 0,
+    )
+    .map((j) => j._id);
+
+  const countByJob = new Map<string, number>();
+  if (doneIds.length > 0) {
+    const counts = await reviewModel.aggregate<{ _id: mongoose.Types.ObjectId; n: number }>([
+      { $match: { jobId: { $in: doneIds } } },
+      { $group: { _id: "$jobId", n: { $sum: 1 } } },
+    ]);
+    for (const row of counts) {
+      countByJob.set(String(row._id), row.n);
+    }
+  }
+
+  return jobs.map((j) => {
+    const nw = Array.isArray(j.assignedWorkerIds) ? j.assignedWorkerIds.length : 0;
+    let feedbackActionable = false;
+    if (j.status === "done" && nw > 0) {
+      const nr = countByJob.get(String(j._id)) ?? 0;
+      feedbackActionable = nr < nw;
+    }
+    return { ...j, feedbackActionable };
+  });
 }
 
 export async function listPendingJobs() {

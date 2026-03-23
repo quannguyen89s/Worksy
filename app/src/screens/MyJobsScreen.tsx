@@ -14,6 +14,28 @@ import type { RootStackParamList } from '@/navigation/types';
 
 const { getErrorMessage } = jobApi;
 
+function jobIdFromJob(job: jobApi.Job): string {
+  const id = job._id as unknown;
+  if (typeof id === 'string') return id;
+  if (id && typeof id === 'object' && '$oid' in (id as object)) {
+    return String((id as { $oid: string }).$oid);
+  }
+  return id != null ? String(id) : '';
+}
+
+function normalizeAssignedWorkers(job: jobApi.Job): { id: string; name: string }[] {
+  const raw = job.assignedWorkerIds;
+  if (!raw || !Array.isArray(raw)) return [];
+  return raw
+    .map((w) => {
+      if (typeof w === 'string') return { id: w, name: 'Thợ' };
+      const o = w as jobApi.AssignedWorkerRef;
+      const id = o._id != null ? String(o._id) : '';
+      return { id, name: (o.name && String(o.name).trim()) || 'Thợ' };
+    })
+    .filter((x) => x.id.length > 0);
+}
+
 export default function MyJobsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [accessToken, setAccessToken] = useState('');
@@ -40,6 +62,13 @@ export default function MyJobsScreen() {
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [pickerValue, setPickerValue] = useState(new Date());
+
+  const [feedbackJob, setFeedbackJob] = useState<jobApi.Job | null>(null);
+  const [feedbackReviews, setFeedbackReviews] = useState<jobApi.JobReviewRow[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackSaving, setFeedbackSaving] = useState<string | null>(null);
+  const [draftRating, setDraftRating] = useState<Record<string, number>>({});
+  const [draftComment, setDraftComment] = useState<Record<string, string>>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -296,6 +325,100 @@ export default function MyJobsScreen() {
   const canEditDelete = (status: string) => status === 'open';
   const canComplete = (job: jobApi.Job) =>
     job.status !== 'done' && job.status !== 'pending' && (job.assignedWorkers ?? 0) > 0;
+
+  const canGiveFeedback = (job: jobApi.Job) =>
+    job.status === 'done' && normalizeAssignedWorkers(job).length > 0;
+
+  /** Nút Đánh giá sáng: job done + có thợ + (API) còn thợ chưa được đánh giá. */
+  const isFeedbackButtonBright = (job: jobApi.Job) => {
+    if (!canGiveFeedback(job)) return false;
+    if (typeof job.feedbackActionable === 'boolean') return job.feedbackActionable;
+    return true;
+  };
+
+  const feedbackButtonLabel = (job: jobApi.Job) =>
+    canGiveFeedback(job) && !isFeedbackButtonBright(job) ? 'Đã đánh giá' : 'Đánh giá';
+
+  const feedbackDetailButtonLabel = (job: jobApi.Job) =>
+    canGiveFeedback(job) && !isFeedbackButtonBright(job) ? 'Đã đánh giá' : 'Đánh giá thợ đã làm việc';
+
+  const feedbackModalTitle = (job: jobApi.Job | null) => {
+    if (!job) return 'Đánh giá thợ';
+    const head =
+      canGiveFeedback(job) && !isFeedbackButtonBright(job) ? 'Đã đánh giá' : 'Đánh giá thợ';
+    return `${head} · ${job.title}`;
+  };
+
+  const openFeedbackModal = useCallback(
+    async (job: jobApi.Job) => {
+      const token = accessToken.trim();
+      if (!token) {
+        Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+        return;
+      }
+      setFeedbackJob(job);
+      setFeedbackLoading(true);
+      setDraftComment({});
+      const jid = jobIdFromJob(job);
+      if (!jid) {
+        setFeedbackLoading(false);
+        Alert.alert('Lỗi', 'Không xác định được mã job.');
+        return;
+      }
+      try {
+        const rev = await jobApi.listJobReviews(token, jid);
+        setFeedbackReviews(rev);
+        const workers = normalizeAssignedWorkers(job);
+        const initR: Record<string, number> = {};
+        workers.forEach((w) => {
+          initR[w.id] = 5;
+        });
+        setDraftRating(initR);
+      } catch (e) {
+        setFeedbackReviews([]);
+        Alert.alert('Lỗi', getErrorMessage(e));
+      } finally {
+        setFeedbackLoading(false);
+      }
+    },
+    [accessToken],
+  );
+
+  const submitWorkerReview = useCallback(
+    async (workerId: string) => {
+      const token = accessToken.trim();
+      if (!token || !feedbackJob) return;
+      const jid = jobIdFromJob(feedbackJob);
+      if (!jid) {
+        Alert.alert('Lỗi', 'Không xác định được mã job.');
+        return;
+      }
+      const rating = draftRating[workerId] ?? 5;
+      if (rating < 1 || rating > 5) {
+        Alert.alert('Lỗi', 'Chọn từ 1 đến 5 sao');
+        return;
+      }
+      const comment = draftComment[workerId]?.trim();
+      setFeedbackSaving(workerId);
+      try {
+        await jobApi.createJobReview(token, {
+          jobId: jid,
+          workerId,
+          rating,
+          ...(comment ? { comment } : {}),
+        });
+        const rev = await jobApi.listJobReviews(token, jid);
+        setFeedbackReviews(rev);
+        await fetchMyJobs();
+        Alert.alert('Thành công', 'Đã gửi đánh giá.');
+      } catch (e) {
+        Alert.alert('Lỗi', getErrorMessage(e));
+      } finally {
+        setFeedbackSaving(null);
+      }
+    },
+    [accessToken, feedbackJob, draftRating, draftComment, fetchMyJobs],
+  );
 
   const formatDateTime = (value?: string | null) => {
     if (!value) return '--';
@@ -604,12 +727,48 @@ export default function MyJobsScreen() {
                     <Text style={[styles.jobBtnActionText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Sửa</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={[styles.deleteInlineBtn, !canEditDelete(job.status) && styles.btnDisabled]}
-                  onPress={() => canEditDelete(job.status) ? handleDelete(job._id, job.title) : Alert.alert('Thông báo', 'Chỉ xóa khi job đang ở trạng thái đang tuyển.')}
-                >
-                  <Text style={[styles.deleteInlineBtnText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Xóa</Text>
-                </TouchableOpacity>
+                <View style={styles.jobBottomRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.feedbackInlineBtn,
+                      !canGiveFeedback(job) && styles.feedbackInlineBtnDim,
+                    ]}
+                    onPress={() => {
+                      if (!canGiveFeedback(job)) {
+                        Alert.alert(
+                          'Thông báo',
+                          job.status !== 'done'
+                            ? 'Chỉ đánh giá sau khi job đã hoàn thành và có thợ được gán.'
+                            : 'Chưa có thợ được gán để đánh giá.',
+                        );
+                        return;
+                      }
+                      void openFeedbackModal(job);
+                    }}
+                    activeOpacity={0.85}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Ionicons
+                      name="star"
+                      size={14}
+                      color={canGiveFeedback(job) ? COLORS.warning : COLORS.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.feedbackInlineBtnText,
+                        !canGiveFeedback(job) && styles.feedbackInlineBtnTextDim,
+                      ]}>
+                      {feedbackButtonLabel(job)}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.deleteInlineBtn, !canEditDelete(job.status) && styles.btnDisabled]}
+                    onPress={() => canEditDelete(job.status) ? handleDelete(job._id, job.title) : Alert.alert('Thông báo', 'Chỉ xóa khi job đang ở trạng thái đang tuyển.')}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    <Text style={[styles.deleteInlineBtnText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Xóa</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -674,6 +833,46 @@ export default function MyJobsScreen() {
                       </View>
                     </>
                   )}
+                  {selectedJob.status === 'done' ? (
+                    <View style={styles.detailSection}>
+                      <TouchableOpacity
+                        style={[
+                          styles.feedbackDetailBtn,
+                          !canGiveFeedback(selectedJob) && styles.feedbackDetailBtnDim,
+                        ]}
+                        onPress={() => {
+                          if (!canGiveFeedback(selectedJob)) {
+                            Alert.alert(
+                              'Thông báo',
+                              normalizeAssignedWorkers(selectedJob).length === 0
+                                ? 'Chưa có thợ được gán để đánh giá.'
+                                : 'Không thể mở đánh giá lúc này.',
+                            );
+                            return;
+                          }
+                          const j = selectedJob;
+                          setSelectedJob(null);
+                          void openFeedbackModal(j);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name="star"
+                          size={22}
+                          color={
+                            canGiveFeedback(selectedJob) ? COLORS.warning : COLORS.textMuted
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.feedbackDetailBtnText,
+                            !canGiveFeedback(selectedJob) && styles.feedbackInlineBtnTextDim,
+                          ]}>
+                          {feedbackDetailButtonLabel(selectedJob)}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
                   {(selectedJob.skillTags?.length ?? 0) > 0 && (
                     <View style={styles.detailSection}>
                       <Text style={styles.detailLabel}>Kỹ năng yêu cầu</Text>
@@ -701,8 +900,12 @@ export default function MyJobsScreen() {
                   <TouchableOpacity
                     style={[styles.btn, styles.btnPrimary, styles.modalActionBtn, !canEditDelete(selectedJob.status) && styles.btnDisabled]}
                     onPress={() => {
-                      if (canEditDelete(selectedJob.status)) { startEdit(selectedJob); setSelectedJob(null); }
-                      else Alert.alert('Thông báo', 'Chỉ chỉnh sửa khi job đang ở trạng thái đang tuyển.');
+                      if (canEditDelete(selectedJob.status)) {
+                        startEdit(selectedJob);
+                        setSelectedJob(null);
+                      } else {
+                        Alert.alert('Thông báo', 'Chỉ chỉnh sửa khi job đang ở trạng thái đang tuyển.');
+                      }
                     }}
                   >
                     <Text style={[styles.btnPrimaryText, !canEditDelete(selectedJob.status) && { color: '#9CA3AF' }]}>Chỉnh sửa</Text>
@@ -837,6 +1040,114 @@ export default function MyJobsScreen() {
           </TouchableOpacity>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={!!feedbackJob}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFeedbackJob(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setFeedbackJob(null)}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle} numberOfLines={2}>
+                {feedbackModalTitle(feedbackJob)}
+              </Text>
+              <TouchableOpacity onPress={() => setFeedbackJob(null)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+              {feedbackLoading ? (
+                <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 24 }} />
+              ) : feedbackJob && normalizeAssignedWorkers(feedbackJob).length === 0 ? (
+                <Text style={styles.detailValue}>
+                  Job đã hoàn thành nhưng chưa có thợ được gán để đánh giá.
+                </Text>
+              ) : (
+                feedbackJob &&
+                normalizeAssignedWorkers(feedbackJob).map((worker) => {
+                  const existing = feedbackReviews.find((r) => String(r.workerId) === worker.id);
+                  return (
+                    <View key={worker.id} style={styles.feedbackWorkerCard}>
+                      <Text style={styles.applicantName}>{worker.name}</Text>
+                      {existing ? (
+                        <View style={{ marginTop: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <Ionicons
+                                key={n}
+                                name={n <= existing.rating ? 'star' : 'star-outline'}
+                                size={18}
+                                color={COLORS.warning}
+                              />
+                            ))}
+                            <Text style={[styles.detailValue, { marginLeft: 4 }]}>Đã gửi</Text>
+                          </View>
+                          {existing.comment ? (
+                            <Text style={[styles.detailValue, { marginTop: 8 }]}>{existing.comment}</Text>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <View style={{ marginTop: 10 }}>
+                          <Text style={[styles.detailLabel, { marginBottom: 6 }]}>Số sao (1–5)</Text>
+                          <View style={styles.feedbackStarsRow}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <TouchableOpacity
+                                key={n}
+                                onPress={() =>
+                                  setDraftRating((prev) => ({ ...prev, [worker.id]: n }))
+                                }
+                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                              >
+                                <Ionicons
+                                  name={n <= (draftRating[worker.id] ?? 5) ? 'star' : 'star-outline'}
+                                  size={30}
+                                  color={COLORS.warning}
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                          <TextInput
+                            placeholder="Nhận xét (không bắt buộc)"
+                            placeholderTextColor={COLORS.textMuted}
+                            value={draftComment[worker.id] ?? ''}
+                            onChangeText={(t) =>
+                              setDraftComment((prev) => ({ ...prev, [worker.id]: t }))
+                            }
+                            style={[styles.input, styles.inputMultiline, { marginTop: 10, minHeight: 72 }]}
+                            multiline
+                          />
+                          <TouchableOpacity
+                            style={[styles.btn, styles.btnPrimary, { marginTop: 12 }]}
+                            disabled={feedbackSaving === worker.id}
+                            onPress={() => void submitWorkerReview(worker.id)}
+                          >
+                            {feedbackSaving === worker.id ? (
+                              <ActivityIndicator color="#fff" />
+                            ) : (
+                              <Text style={styles.btnPrimaryText}>Gửi đánh giá</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnOutline, styles.modalActionBtn]}
+                onPress={() => setFeedbackJob(null)}
+              >
+                <Text style={styles.btnOutlineText}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
+
       <UserBottomBar navigation={navigation} active="MyJobs" />
     </SafeAreaView>
   );
@@ -967,8 +1278,38 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderLight,
   },
   jobBtnActionText: { color: COLORS.textSecondary, fontWeight: '700', fontSize: 13 },
+  jobBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    gap: 10,
+  },
+  feedbackInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.warningLight,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  feedbackInlineBtnDim: {
+    opacity: 0.5,
+    backgroundColor: COLORS.borderLight,
+    borderColor: COLORS.border,
+  },
+  feedbackInlineBtnText: {
+    color: COLORS.primaryDark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  feedbackInlineBtnTextDim: {
+    color: COLORS.textMuted,
+  },
   deleteInlineBtn: {
-    alignSelf: 'flex-end',
     backgroundColor: COLORS.errorLight,
     borderRadius: 10,
     paddingHorizontal: 10,
@@ -1078,4 +1419,39 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   skillTagText: { fontSize: 14, color: COLORS.primaryDark, fontWeight: '600' },
+  feedbackWorkerCard: {
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+    backgroundColor: '#FAFAF9',
+  },
+  feedbackStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  feedbackDetailBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.warningLight,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  feedbackDetailBtnDim: {
+    opacity: 0.55,
+    backgroundColor: COLORS.borderLight,
+    borderColor: COLORS.border,
+  },
+  feedbackDetailBtnText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
 });

@@ -1,9 +1,14 @@
 import { Router } from "express";
-import { createReviewController } from "../controllers/review.controller";
-import { requireAuth, requireRole } from "../middlewares/requireAuth.middleware";
+import {
+  createReviewController,
+  listReviewsForJobController,
+} from "../controllers/review.controller";
+import { requireAuth } from "../middlewares/requireAuth.middleware";
 
 const reviewRouter = Router();
 
-reviewRouter.post("/", requireAuth, requireRole("customer"), createReviewController);
+/** Chỉ requireAuth: quyền chủ job được kiểm tra trong review.service (createdBy === user). */
+reviewRouter.get("/job/:jobId", requireAuth, listReviewsForJobController);
+reviewRouter.post("/", requireAuth, createReviewController);
 
 export default reviewRouter;

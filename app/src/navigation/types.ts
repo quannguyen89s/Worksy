@@ -14,6 +14,7 @@ export type RootStackParamList = {
   AdminSettings: undefined;
   AdminAlerts: undefined;
 };
+
 declare global {
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList { }

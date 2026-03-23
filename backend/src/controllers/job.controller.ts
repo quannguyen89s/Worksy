@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { paramId } from "../utils/routeParams";
 import * as jobService from "../services/job.service";
+import * as reviewService from "../services/review.service";
 
 export const listJobsBrowseController = asyncHandler(async (req: Request, res: Response) => {
   const search = typeof req.query.search === "string" ? req.query.search : undefined;
@@ -208,3 +209,35 @@ export const approveJobController = asyncHandler(async (req: Request, res: Respo
   const data = await jobService.approveJob(paramId(req));
   res.json({ success: true, data });
 });
+
+/** Đánh giá thợ (chủ job): cùng nhóm URL với /jobs để tránh 404 proxy / path sai. */
+export const listJobReviewsForOwnerController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const jobId = paramId(req);
+    const data = await reviewService.listReviewsForCustomerJob(
+      req.user!.id,
+      jobId,
+    );
+    res.json({ success: true, data });
+  },
+);
+
+export const createJobReviewForOwnerController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const jobId = paramId(req);
+    const { workerId, rating, comment } = req.body as {
+      workerId: string;
+      rating: number;
+      comment?: string;
+    };
+    const payload: {
+      jobId: string;
+      workerId: string;
+      rating: number;
+      comment?: string;
+    } = { jobId, workerId, rating };
+    if (comment !== undefined) payload.comment = comment;
+    const data = await reviewService.createReview(req.user!.id, payload);
+    res.status(201).json({ success: true, data });
+  },
+);
