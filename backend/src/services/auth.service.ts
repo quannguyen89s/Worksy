@@ -31,7 +31,12 @@ export const loginService = async (email: string, password: string) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    return { message: USER_MESSAGE.LOGIN_SUCCESSFUL, accessToken, refreshToken };
+    return {
+        message: USER_MESSAGE.LOGIN_SUCCESSFUL,
+        accessToken,
+        refreshToken,
+        user: { id: user._id.toString(), role: user.role, name: user.name },
+    };
 }
 
 export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {

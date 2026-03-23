@@ -46,7 +46,54 @@ export type Job = {
   status: string;
   createdBy: string;
   createdAt?: string;
+  distanceKm?: number;
 };
+
+export type BrowseJobsParams = {
+  search?: string;
+  status?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  skillTags?: string;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  sort?: 'price_asc' | 'price_desc' | 'date_desc' | 'date_asc' | 'distance';
+  page?: number;
+  limit?: number;
+};
+
+export type BrowseJobsResult = {
+  data: Job[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export async function browseJobs(
+  accessToken: string,
+  params?: BrowseJobsParams,
+): Promise<BrowseJobsResult> {
+  const q = new URLSearchParams();
+  if (params?.search) q.set('search', params.search);
+  if (params?.status) q.set('status', params.status);
+  if (params?.minPrice != null) q.set('minPrice', String(params.minPrice));
+  if (params?.maxPrice != null) q.set('maxPrice', String(params.maxPrice));
+  if (params?.skillTags) q.set('skillTags', params.skillTags);
+  if (params?.lat != null) q.set('lat', String(params.lat));
+  if (params?.lng != null) q.set('lng', String(params.lng));
+  if (params?.radiusKm != null) q.set('radiusKm', String(params.radiusKm));
+  if (params?.sort) q.set('sort', params.sort);
+  if (params?.page != null) q.set('page', String(params.page));
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  const query = q.toString();
+  const url = `${API_BASE}/jobs/browse${query ? `?${query}` : ''}`;
+  const { data } = await axios.get(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return { data: data.data, total: data.total, page: data.page, limit: data.limit };
+}
 
 export async function createJob(accessToken: string, body: JobCreateBody): Promise<Job> {
   const { data } = await axios.post(`${API_BASE}/jobs`, body, {

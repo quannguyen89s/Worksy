@@ -1,49 +1,45 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-
-const COLORS = {
-  primary: '#D97706',
-  primaryLight: '#FEF3C7',
-  background: '#FFFBEB',
-  card: '#FFFFFF',
-  text: '#1F2937',
-  textMuted: '#6B7280',
-};
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { COLORS } from '@/theme/colors';
+import type { RootStackParamList } from '@/navigation/types';
 
 export default function HomeScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]} edges={['top']}>
-      {/* Header */}
+    <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.logo}>Worksy</Text>
-        <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
+        <View>
+          <Text style={styles.logo}>Worksy</Text>
+          <Text style={styles.greeting}>Chào mừng bạn trở lại</Text>
+        </View>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Quick actions */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thao tác nhanh</Text>
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8}>
-              <Text style={styles.actionBtnText}>🔍 Tìm việc</Text>
+            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
+              <Text style={styles.actionIcon}>🔍</Text>
+              <Text style={styles.actionBtnText}>Tìm việc</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.8}>
-              <Text style={styles.actionBtnText}>📝 Đăng tin</Text>
+            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
+              <Text style={styles.actionIcon}>📝</Text>
+              <Text style={styles.actionBtnText}>Đăng tin</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionBtn}
-              activeOpacity={0.8}
-              onPress={() => (navigation as { navigate: (name: string) => void }).navigate('MyJobs')}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('MyJobs')}
             >
-              <Text style={styles.actionBtnText}>📋 Tin của tôi</Text>
+              <Text style={styles.actionIcon}>📋</Text>
+              <Text style={styles.actionBtnText}>Tin của tôi</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Stats */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Tổng quan</Text>
           <View style={styles.statsRow}>
@@ -58,10 +54,10 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Recent */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Việc làm mới nhất</Text>
           <View style={styles.emptyBox}>
+            <Text style={styles.emptyIcon}>📌</Text>
             <Text style={styles.emptyText}>Chưa có việc làm nào</Text>
           </View>
         </View>
@@ -74,55 +70,68 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: 24,
-    paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 22,
+    backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  logo: { fontSize: 28, fontWeight: '800', color: '#1F2937' },
-  greeting: { fontSize: 15, color: '#6B7280', marginTop: 4 },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderBottomColor: COLORS.borderLight,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
-  cardTitle: { fontSize: 17, fontWeight: '600', color: '#1F2937', marginBottom: 16 },
-  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  logo: { fontSize: 30, fontWeight: '800', color: COLORS.text, letterSpacing: -0.3 },
+  greeting: { fontSize: 15, color: COLORS.textMuted, marginTop: 6 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: 20, paddingBottom: 44 },
+  card: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 22,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 18 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   actionBtn: {
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  actionBtnText: { color: '#92400E', fontWeight: '600', fontSize: 15 },
-  statsRow: { flexDirection: 'row', gap: 12 },
-  statBox: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  statLabel: { fontSize: 14, color: '#6B7280' },
-  statValue: { fontSize: 24, fontWeight: '700', color: '#1F2937', marginTop: 4 },
-  emptyBox: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 32,
+    minWidth: '30%',
+    backgroundColor: COLORS.primaryLight,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(180, 83, 9, 0.15)',
   },
-  emptyText: { fontSize: 15, color: '#9CA3AF' },
+  actionIcon: { fontSize: 28, marginBottom: 8 },
+  actionBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: 14 },
+  statsRow: { flexDirection: 'row', gap: 14 },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statLabel: { fontSize: 14, color: COLORS.textMuted },
+  statValue: { fontSize: 26, fontWeight: '800', color: COLORS.primary, marginTop: 6 },
+  emptyBox: {
+    backgroundColor: '#FAFAF9',
+    borderRadius: 16,
+    padding: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+  },
+  emptyIcon: { fontSize: 40, marginBottom: 12, opacity: 0.5 },
+  emptyText: { fontSize: 15, color: COLORS.textMuted },
 });

@@ -3,6 +3,52 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { paramId } from "../utils/routeParams";
 import * as jobService from "../services/job.service";
 
+export const listJobsBrowseController = asyncHandler(async (req: Request, res: Response) => {
+  const search = typeof req.query.search === "string" ? req.query.search : undefined;
+  const statusRaw = req.query.status;
+  const status = Array.isArray(statusRaw)
+    ? (statusRaw as string[])
+    : typeof statusRaw === "string"
+      ? statusRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+  const minPrice = req.query.minPrice != null ? Number(req.query.minPrice) : undefined;
+  const maxPrice = req.query.maxPrice != null ? Number(req.query.maxPrice) : undefined;
+  const skillTagsRaw = req.query.skillTags;
+  const skillTags = Array.isArray(skillTagsRaw)
+    ? (skillTagsRaw as string[])
+    : typeof skillTagsRaw === "string"
+      ? skillTagsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+  const lat = req.query.lat != null ? Number(req.query.lat) : undefined;
+  const lng = req.query.lng != null ? Number(req.query.lng) : undefined;
+  const radiusKm = req.query.radiusKm != null ? Number(req.query.radiusKm) : 10;
+  const sort = typeof req.query.sort === "string" ? req.query.sort : undefined;
+  const page = req.query.page != null ? Number(req.query.page) : 1;
+  const limit = req.query.limit != null ? Number(req.query.limit) : 20;
+
+  const validSorts = ["price_asc", "price_desc", "date_desc", "date_asc", "distance"] as const;
+  const validSort = sort && validSorts.includes(sort as typeof validSorts[number])
+    ? (sort as typeof validSorts[number])
+    : ("date_desc" as const);
+
+  const filters: Parameters<typeof jobService.listJobsForWorker>[0] = {
+    radiusKm: Number.isFinite(radiusKm) ? radiusKm : 10,
+    sort: validSort,
+    page: Math.max(1, Math.floor(page)),
+    limit: Math.min(50, Math.max(1, Math.floor(limit))),
+  };
+  if (search) filters.search = search;
+  if (status?.length) filters.status = status;
+  if (Number.isFinite(minPrice)) filters.minPrice = minPrice!;
+  if (Number.isFinite(maxPrice)) filters.maxPrice = maxPrice!;
+  if (skillTags?.length) filters.skillTags = skillTags;
+  if (Number.isFinite(lat)) filters.lat = lat!;
+  if (Number.isFinite(lng)) filters.lng = lng!;
+
+  const data = await jobService.listJobsForWorker(filters);
+  res.json({ success: true, ...data });
+});
+
 export const listJobsController = asyncHandler(async (req: Request, res: Response) => {
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
