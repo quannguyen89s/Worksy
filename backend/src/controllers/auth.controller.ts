@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { loginService, registerService, verifyEmailService, resendVerifyEmailService, forgotPasswordService, verifyForgotPasswordOTPService, resetPasswordService, logoutService } from "../services/auth.service";
+import { googleLoginService } from "../services/google.service";
 import { LoginRequestBody, RegisterRequestBody, VerifyEmailRequestBody, ForgotPasswordRequestBody, VerifyForgotPasswordOTPRequestBody, ResetPasswordRequestBody } from "../models/request/user.request";
 import { ParamsDictionary } from "express-serve-static-core";
 import HTTP_STATUS from "../constants/httpStatus";
@@ -20,6 +21,20 @@ export const logoutController = async (req: Request, res: Response) => {
     try {
         const user = req.user as { _id: string };
         const result = await logoutService(user._id);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        console.log(error);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ message: USER_MESSAGE.INTERNAL_SERVER_ERROR });
+    }
+}
+
+export const googleLoginController = async (req: Request, res: Response) => {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({ message: "Google ID token is required" });
+        }
+        const result = await googleLoginService(idToken);
         return res.status(HTTP_STATUS.OK).json(result);
     } catch (error) {
         console.log(error);

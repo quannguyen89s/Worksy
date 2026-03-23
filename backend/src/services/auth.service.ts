@@ -4,33 +4,8 @@ import jwt from "jsonwebtoken";
 import { ObjectId } from "mongodb";
 import USER_MESSAGE from "../constants/userMessage";
 import { sendVerifyEmail, sendForgotPasswordEmail } from "./email.service";
+import { signAccessToken, signRefreshToken, signEmailVerifyToken } from "../utils/jwt";
 
-const signAccessToken = (userId: string, role: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_ACCESS_TOKEN!, { expiresIn: "1h" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
-}
-
-const signRefreshToken = (userId: string, role: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId, role }, process.env.JWT_SECRET_REFRESH_TOKEN!, { expiresIn: "7d" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
-}
-
-const signEmailVerifyToken = (userId: string) => {
-    return new Promise<string>((resolve, reject) => {
-        jwt.sign({ _id: userId }, process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN!, { expiresIn: "1d" }, (err, token) => {
-            if (err) reject(err);
-            resolve(token as string);
-        });
-    });
-}
 
 const generateOTP = (): string => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -172,3 +147,5 @@ export const logoutService = async (userId: string) => {
     await userModel.updateOne({ _id: userId }, { refreshToken: "" });
     return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
 }
+
+

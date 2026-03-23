@@ -20,6 +20,7 @@ export const USER_MESSAGE = {
     INVALID_TOKEN: "Invalid token",
     // Auth
     LOGIN_SUCCESSFUL: "Login successful",
+    GOOGLE_LOGIN_SUCCESSFUL: "Google login successful",
     REGISTER_SUCCESSFUL: "Register successful",
     USER_NOT_FOUND: "User not found",
     INVALID_PASSWORD: "Invalid password",
