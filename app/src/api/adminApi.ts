@@ -29,6 +29,20 @@ export function decodeJwtRole(token: string): string | null {
   }
 }
 
+/**
+ * Axios admin (`adminApi`) dùng `worksy_admin_token` — sau login/refresh cần đồng bộ từ access JWT.
+ * User không phải admin → xóa token admin cũ (tránh gọi API admin bằng session user thường).
+ */
+export async function syncAdminApiTokenFromAccessToken(accessToken: string): Promise<string | null> {
+  const role = decodeJwtRole(accessToken);
+  if (role === 'admin') {
+    await setAdminToken(accessToken);
+  } else {
+    await setAdminToken(null);
+  }
+  return role;
+}
+
 /** Tên trong JWT (backend ký khi login) — dùng avatar chữ trên dashboard. */
 export function decodeJwtName(token: string): string | null {
   try {

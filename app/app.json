@@ -1,5 +1,6 @@
 {
   "expo": {
+    "scheme": "worksy",
     "name": "Worksy",
     "slug": "Worksy",
     "version": "1.0.0",
@@ -7,12 +8,15 @@
       "enabled": false
     },
     "web": {
+      "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
       "tsconfigPaths": true
     },
     "plugins": [
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin",
       "expo-secure-store"
     ],
     "orientation": "portrait",
@@ -24,7 +28,9 @@
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
+      
       "**/*"
+    
     ],
     "ios": {
       "supportsTablet": true

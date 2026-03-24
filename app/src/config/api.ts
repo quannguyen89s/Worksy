@@ -44,5 +44,8 @@ export const API_BASE_URL: string = (() => {
   if (Platform.OS === 'android') {
     return `http://10.0.2.2:${API_PORT}`;
   }
-  return `http://127.0.0.1:${API_PORT}`;
+  if (Platform.OS === 'ios') {
+    return `http://127.0.0.1:${API_PORT}`;
+  }
+  return `http://172.16.0.22:${API_PORT}`;
 })();

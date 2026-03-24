@@ -3,9 +3,9 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { paramId } from "../utils/routeParams";
 import * as adminService from "../services/admin.service";
 
-function parsePageLimit(req: Request) {
+function parsePageLimit(req: Request, maxLimit = 100) {
   const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+  const limit = Math.min(maxLimit, Math.max(1, Number(req.query.limit) || 20));
   return { page, limit };
 }
 
@@ -27,7 +27,7 @@ export const adminMetaCategoriesController = asyncHandler(
 
 export const adminListUsersController = asyncHandler(
   async (req: Request, res: Response) => {
-    const { page, limit } = parsePageLimit(req);
+    const { page, limit } = parsePageLimit(req, 500);
     const role =
       typeof req.query.role === "string" ? req.query.role : undefined;
     const search =

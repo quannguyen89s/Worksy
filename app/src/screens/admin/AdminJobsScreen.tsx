@@ -108,10 +108,13 @@ export default function AdminJobsScreen({ navigation }: Props) {
   const pages = Math.max(1, Math.ceil(total / limit));
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: adminTheme.bgPage }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: adminTheme.bgPage }} edges={['top']}>
       <View
-        className="flex-row items-center px-4 py-3"
         style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
           backgroundColor: adminTheme.bgHeader,
           borderBottomWidth: 1,
           borderBottomColor: adminTheme.borderSoft,
@@ -120,13 +123,19 @@ export default function AdminJobsScreen({ navigation }: Props) {
           <Text style={{ color: adminTheme.brown, fontSize: 16 }}>←</Text>
         </TouchableOpacity>
         <Text
-          className="mr-6 flex-1 text-center text-lg font-bold"
-          style={{ color: adminTheme.brown }}>
+          style={{
+            flex: 1,
+            marginRight: 24,
+            textAlign: 'center',
+            fontSize: 18,
+            fontWeight: '700',
+            color: adminTheme.brown,
+          }}>
           Việc làm
         </Text>
       </View>
 
-      <View className="px-4 pt-3">
+      <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
         {error ? (
           <View className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
             <Text style={{ color: adminTheme.danger, fontSize: 13 }}>{error}</Text>

@@ -1,5 +1,6 @@
 import cors from "cors";
 import express, { json, Request, Response, urlencoded } from "express";
+import path from "path";
 import { getCorsOptions } from "./config/corsOptions";
 import { errorHandler } from "./middlewares/error.middlewares";
 
@@ -14,14 +15,17 @@ import userRouter from "./routes/user.routes";
 
 import "./models/user.model";
 import "./models/job.model";
-import "./models/application.model";
+import "./models/application.model";import profileRouter from "./routes/profile.route";
+
 
 const app = express();
 
 app.use(cors(getCorsOptions()));
 app.use(json({ limit: '20mb' }));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(urlencoded({ extended: true, limit: '20mb' }));
 
+app.use("/profile", profileRouter)
 app.get("/", (_req: Request, res: Response) => {
   res.json("Connect successful");
 });

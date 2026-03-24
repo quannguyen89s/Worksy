@@ -44,6 +44,23 @@ export const USER_MESSAGE = {
     RESET_PASSWORD_SUCCESSFUL: "Reset password successfully",
     LOGOUT_SUCCESSFUL: "Logout successfully",
 
+    // Refresh Token
+    REFRESH_TOKEN_REQUIRED: "Refresh token is required",
+    INVALID_REFRESH_TOKEN: "Invalid or expired refresh token",
+    REFRESH_TOKEN_SUCCESSFUL: "Token refreshed successfully",
+
+    // Profile
+    UPDATE_PROFILE_SUCCESSFUL: "Update profile successfully",
+    CHANGE_PASSWORD_SUCCESSFUL: "Change password successfully",
+    CURRENT_PASSWORD_REQUIRED: "Current password is required",
+    NEW_PASSWORD_REQUIRED: "New password is required",
+    CURRENT_PASSWORD_WRONG: "Current password is incorrect",
+    NEW_PASSWORD_SAME_AS_OLD: "New password must be different from current password",
+    NAME_MUST_BE_STRING: "Name must be a string",
+    AVATAR_MUST_BE_STRING: "Avatar must be a string",
+    AVATAR_MUST_BE_URL: "Avatar must be a valid URL",
+    NO_UPDATE_FIELDS: "At least one field must be provided to update",
+
     // General
     UNAUTHORIZED: "You do not have permission to access this resource",
     INTERNAL_SERVER_ERROR: "Internal server error",

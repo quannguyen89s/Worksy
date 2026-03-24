@@ -1,9 +1,16 @@
-import { JwtPayload } from "jsonwebtoken";
+/// <reference types="multer" />
+
+import type { JwtPayload } from "jsonwebtoken";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: { _id: string; role: string } | string | JwtPayload;
+      /** Set by JWT auth middleware */
+      user?: { id: string; role: string; name: string } | string | JwtPayload;
+      /** Set by multer `.single()` / `.array()` */
+      file?: Express.Multer.File;
     }
   }
 }
+
+export {};

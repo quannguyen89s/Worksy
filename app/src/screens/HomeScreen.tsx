@@ -10,7 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 import AuthService from '@/services/authService';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
-import { decodeJwtRole } from '@/api/adminApi';
+import { decodeJwtRole, setAdminToken, syncAdminApiTokenFromAccessToken } from '@/api/adminApi';
 
 type UserRole = 'customer' | 'worker' | 'admin' | 'guest';
 
@@ -22,19 +22,24 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void SecureStore.getItemAsync('accessToken').then((token) => {
+      void SecureStore.getItemAsync('accessToken').then(async (token) => {
         if (!token) {
           setRole('guest');
           return;
         }
         const decoded = decodeJwtRole(token);
-        if (decoded === 'customer' || decoded === 'worker' || decoded === 'admin') {
+        if (decoded === 'admin') {
+          await syncAdminApiTokenFromAccessToken(token);
+          navigation.reset({ index: 0, routes: [{ name: 'AdminDashboard' }] });
+          return;
+        }
+        if (decoded === 'customer' || decoded === 'worker') {
           setRole(decoded);
         } else {
           setRole('guest');
         }
       });
-    }, []),
+    }, [navigation]),
   );
   const handleOpenMessages = () => navigation.navigate('Messages');
 
@@ -44,12 +49,13 @@ export default function HomeScreen() {
     try {
       const accessToken = await SecureStore.getItemAsync('accessToken');
       if (accessToken) {
-        await AuthService.logout(accessToken);
+        await AuthService.logout();
       }
     } catch {
       // Always clear local auth data even if server logout fails.
     } finally {
       await Promise.all([
+        setAdminToken(null),
         SecureStore.deleteItemAsync('accessToken'),
         SecureStore.deleteItemAsync('refreshToken'),
       ]);
@@ -62,7 +68,13 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.bg }]} edges={['top']}>
       <UserHeader
         title="Worksy"
-        subtitle={role === 'customer' ? 'Không gian khách hàng' : 'Không gian người lao động'}
+        subtitle={
+          role === 'customer'
+            ? 'Không gian khách hàng'
+            : role === 'worker'
+              ? 'Không gian người lao động'
+              : 'Worksy'
+        }
         leftIcon="menu"
         onLeftPress={() => {}}
         rightLabel={loggingOut ? 'Đang thoát...' : 'Đăng xuất'}

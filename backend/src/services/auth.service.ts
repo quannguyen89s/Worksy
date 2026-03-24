@@ -21,13 +21,17 @@ export const loginService = async (email: string, password: string) => {
         throw new AppError("User account has been deleted", HTTP_STATUS.FORBIDDEN);
     }
     if (!user.password) {
-        throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
+        throw new AppError(
+            "This account has no password (e.g. Google sign-in only). Please use Google login.",
+            HTTP_STATUS.BAD_REQUEST,
+        );
     }
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
         throw new AppError(USER_MESSAGE.INVALID_PASSWORD, HTTP_STATUS.UNAUTHORIZED);
     }
-    if (!user.isVerified) {
+    // Chặn login nếu email chưa verify; set ALLOW_UNVERIFIED_LOGIN=true trong .env để bỏ qua (chỉ dev)
+    if (!user.isVerified && process.env.ALLOW_UNVERIFIED_LOGIN !== "true") {
         throw new AppError(USER_MESSAGE.EMAIL_NOT_VERIFIED, HTTP_STATUS.FORBIDDEN);
     }
     const [accessToken, refreshToken] = await Promise.all([
@@ -153,4 +157,26 @@ export const resetPasswordService = async (email: string, otp: string, password:
 export const logoutService = async (userId: string) => {
     await userModel.updateOne({ _id: userId }, { refreshToken: "" });
     return { message: USER_MESSAGE.LOGOUT_SUCCESSFUL };
+}
+
+export const refreshTokenService = async (refreshToken: string) => {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET_REFRESH_TOKEN!) as { _id: string; role: string };
+
+    const user = await userModel.findById(decoded._id);
+    if (!user) {
+        throw new AppError(USER_MESSAGE.USER_NOT_FOUND, HTTP_STATUS.NOT_FOUND);
+    }
+    if (user.refreshToken !== refreshToken) {
+        throw new AppError(USER_MESSAGE.INVALID_REFRESH_TOKEN, HTTP_STATUS.UNAUTHORIZED);
+    }
+
+    const [newAccessToken, newRefreshToken] = await Promise.all([
+        signAccessToken(user._id.toString(), user.role),
+        signRefreshToken(user._id.toString(), user.role),
+    ]);
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 }

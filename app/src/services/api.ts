@@ -1,9 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '@/config/api';
 
-export const BASE_URL = 'http://172.16.0.116:3000';
+/** Giữ tên cũ cho `socket.ts` và code import `BASE_URL` — luôn trùng `API_BASE_URL`. */
+export const BASE_URL = API_BASE_URL;
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = axios.create({ baseURL: API_BASE_URL });
 
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('token');

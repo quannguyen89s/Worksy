@@ -66,8 +66,9 @@ export default function UserBottomBar({
     }, []),
   );
 
+  // Admin không dùng layout worker; nếu vẫn ở màn user, dùng tab giống customer (Home sẽ redirect lên AdminDashboard).
   const routes: UserRoute[] =
-    role === 'customer'
+    role === 'customer' || role === 'admin'
       ? ['Home', 'MyJobs', 'Notifications', 'Messages']
       : ['Home', 'BrowseJobs', 'WorkerApplies', 'Notifications', 'Messages'];
 

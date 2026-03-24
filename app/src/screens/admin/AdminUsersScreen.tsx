@@ -40,9 +40,7 @@ export default function AdminUsersScreen({ navigation }: Props) {
   const bottomBarHeight = TAB_H + bottomPad;
 
   const [items, setItems] = useState<UserRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const limit = 15;
+  const limit = 500;
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -73,19 +71,18 @@ export default function AdminUsersScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const res = await fetchUsers({
-        page,
+        page: 1,
         limit,
         ...(roleFilter ? { role: roleFilter } : {}),
         ...(search ? { search } : {}),
       });
       setItems(res.items);
-      setTotal(res.total);
     } catch (e) {
       setError(toErrMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [page, roleFilter, search]);
+  }, [roleFilter, search, limit]);
 
   useFocusEffect(
     useCallback(() => {
@@ -140,8 +137,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
     }
   }
 
-  const pages = Math.max(1, Math.ceil(total / limit));
-
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: adminTheme.bgPage }}>
       <View
@@ -177,7 +172,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
               backgroundColor: roleFilter === '' ? adminTheme.brown : adminTheme.pillBg,
             }}
             onPress={() => {
-              setPage(1);
               setRoleFilter('');
             }}>
             <Text
@@ -197,7 +191,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
                 backgroundColor: roleFilter === r ? adminTheme.brown : adminTheme.pillBg,
               }}
               onPress={() => {
-                setPage(1);
                 setRoleFilter(r);
               }}>
               <Text
@@ -225,7 +218,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
             value={searchInput}
             onChangeText={setSearchInput}
             onSubmitEditing={() => {
-              setPage(1);
               setSearch(searchInput.trim());
             }}
           />
@@ -233,7 +225,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
             className="justify-center rounded-xl px-4 py-2"
             style={{ backgroundColor: adminTheme.pillBg }}
             onPress={() => {
-              setPage(1);
               setSearch(searchInput.trim());
             }}>
             <Text className="font-semibold" style={{ color: adminTheme.brown }}>
@@ -251,7 +242,7 @@ export default function AdminUsersScreen({ navigation }: Props) {
           keyExtractor={(u) => u._id}
           contentContainerStyle={{
             paddingHorizontal: 16,
-            paddingBottom: bottomBarHeight + 70,
+            paddingBottom: bottomBarHeight + 24,
           }}
           refreshing={loading}
           onRefresh={() => void load()}
@@ -355,32 +346,6 @@ export default function AdminUsersScreen({ navigation }: Props) {
           )}
         />
       )}
-
-      <View
-        className="absolute left-0 right-0 flex-row items-center justify-center gap-4 border-t py-3"
-        style={{
-          borderTopColor: adminTheme.borderSoft,
-          backgroundColor: adminTheme.card,
-          bottom: bottomBarHeight,
-        }}>
-        <TouchableOpacity
-          disabled={page <= 1}
-          onPress={() => setPage((p) => Math.max(1, p - 1))}
-          className="px-3 py-1">
-          <Text style={{ color: page <= 1 ? adminTheme.brownMuted : adminTheme.brown }}>Trước</Text>
-        </TouchableOpacity>
-        <Text className="text-sm" style={{ color: adminTheme.brownMuted }}>
-          {page}/{pages} · {total} người
-        </Text>
-        <TouchableOpacity
-          disabled={page >= pages}
-          onPress={() => setPage((p) => p + 1)}
-          className="px-3 py-1">
-          <Text style={{ color: page >= pages ? adminTheme.brownMuted : adminTheme.brown }}>
-            Sau
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       <TouchableOpacity
         style={{
