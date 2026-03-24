@@ -979,11 +979,11 @@ export default function MyJobsScreen() {
                       canComplete(job)
                         ? handleComplete(job)
                         : Alert.alert(
-                            'Thông báo',
-                            job.status === 'done'
-                              ? 'Job đã hoàn thành.'
-                              : 'Cần có worker được gán trước khi set done.',
-                          )
+                          'Thông báo',
+                          job.status === 'done'
+                            ? 'Job đã hoàn thành.'
+                            : 'Cần có worker được gán trước khi set done.',
+                        )
                     }
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
@@ -1203,7 +1203,7 @@ export default function MyJobsScreen() {
         onRequestClose={() => setShowApplicantsModal(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowApplicantsModal(false)}>
-          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => {}}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => { }}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Ứng viên theo điểm</Text>
               <TouchableOpacity onPress={() => setShowApplicantsModal(false)} style={styles.modalCloseBtn}>
@@ -1292,7 +1292,7 @@ export default function MyJobsScreen() {
         onRequestClose={cancelPickerValue}
       >
         <Pressable style={styles.modalOverlay} onPress={cancelPickerValue}>
-          <TouchableOpacity style={styles.pickerModalContent} activeOpacity={1} onPress={() => {}}>
+          <TouchableOpacity style={styles.pickerModalContent} activeOpacity={1} onPress={() => { }}>
             <View style={styles.pickerModalHeader}>
               <Text style={styles.pickerModalTitle}>
                 {pickerMode === 'date' ? 'Chọn ngày làm' : 'Chọn giờ làm'}
@@ -1324,7 +1324,7 @@ export default function MyJobsScreen() {
         onRequestClose={() => setFeedbackJob(null)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setFeedbackJob(null)}>
-          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => {}}>
+          <TouchableOpacity style={styles.modalContent} activeOpacity={1} onPress={() => { }}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={2}>
                 {feedbackModalTitle(feedbackJob)}

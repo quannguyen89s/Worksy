@@ -15,8 +15,9 @@ import userRouter from "./routes/user.routes";
 
 import "./models/user.model";
 import "./models/job.model";
-import "./models/application.model";import profileRouter from "./routes/profile.route";
-
+import "./models/application.model";
+import profileRouter from "./routes/profile.route";
+import { mountOpenApiDocs } from "./openapi-docs";
 
 const app = express();
 
@@ -25,9 +26,15 @@ app.use(json({ limit: '20mb' }));
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use(urlencoded({ extended: true, limit: '20mb' }));
 
-app.use("/profile", profileRouter)
+mountOpenApiDocs(app);
+
+app.use("/profile", profileRouter);
 app.get("/", (_req: Request, res: Response) => {
-  res.json("Connect successful");
+  res.json({
+    message: "Connect successful",
+    docs: "/reference",
+    openapi: "/openapi.yaml",
+  });
 });
 
 app.use("/auth", authRouter);

@@ -1,0 +1,1233 @@
+openapi: 3.0.3
+info:
+  title: Worksy API
+  description: |
+    API backend ứng dụng Worksy — kết nối khách hàng (customer) và thợ (worker).
+    Xác thực qua JWT Bearer (trừ các endpoint `/auth` công khai).
+  version: 1.0.0
+  contact:
+    name: Worksy
+
+servers:
+  - url: http://localhost:3000
+    description: Local
+  - url: http://127.0.0.1:3000
+    description: Local (127.0.0.1)
+
+tags:
+  - name: Auth
+  - name: Jobs
+  - name: Apply
+  - name: Review
+  - name: Profile
+  - name: Users
+  - name: Chat
+  - name: Notifications
+  - name: Admin
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: accessToken từ login / refresh-token / google-token
+
+  schemas:
+    Location:
+      type: object
+      required: [lat, lng]
+      properties:
+        lat: { type: number, format: float }
+        lng: { type: number, format: float }
+      example:
+        lat: 21.0285
+        lng: 105.8542
+
+    ErrorMessage:
+      type: object
+      properties:
+        message: { type: string }
+        success: { type: boolean }
+      example:
+        success: false
+        message: "Email hoặc mật khẩu không đúng"
+
+    LoginResponse:
+      type: object
+      description: Cấu trúc thực tế có thể khác theo auth.service
+      example:
+        accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          _id: "507f1f77bcf86cd799439011"
+          name: "Nguyễn Văn A"
+          email: "khach@example.com"
+          role: "customer"
+
+    JobListItem:
+      type: object
+      example:
+        _id: "507f1f77bcf86cd799439011"
+        title: "Sửa chữa điện nước tại nhà"
+        description: "Thay ổ cắm, kiểm tra aptomat"
+        price: 500000
+        status: "open"
+        assignedWorkers: 0
+        requiredWorkers: 2
+        location:
+          lat: 21.0285
+          lng: 105.8542
+        address: "Quận Ba Đình, Hà Nội"
+        scheduledAt: "2026-03-25T08:00:00.000Z"
+        skillTags: ["điện", "sửa chữa"]
+
+  examples:
+    loginRequest:
+      summary: Khách hàng
+      value:
+        email: khach@example.com
+        password: "Abc12345"
+    loginWorker:
+      summary: Thợ
+      value:
+        email: tho@example.com
+        password: "Worker1A"
+    registerRequest:
+      summary: Đăng ký customer
+      value:
+        name: "Trần Thị B"
+        email: "newuser@example.com"
+        password: "MatKhau1A"
+        confirm_password: "MatKhau1A"
+        location:
+          lat: 21.0285
+          lng: 105.8542
+    createJobRequest:
+      summary: Tạo tin tuyển thợ
+      value:
+        title: "Lắp đặt camera an ninh"
+        description: "Lắp 4 camera IP, dây đi ngầm, bảo hành 12 tháng"
+        price: 3500000
+        location:
+          lat: 21.0285
+          lng: 105.8542
+        address: "Ngõ 10, phố Láng Hạ, Đống Đa, Hà Nội"
+        scheduledAt: "2026-04-01T09:00:00.000Z"
+        requiredWorkers: 2
+        skillTags: ["camera", "điện nhẹ"]
+    applyRequest:
+      summary: Worker ứng tuyển
+      value:
+        jobId: "507f1f77bcf86cd799439011"
+        priceOffer: 3200000
+    selectWorkersRequest:
+      summary: Chọn 2 thợ
+      value:
+        workerIds:
+          - "507f191e810c19729de860ea"
+          - "507f191e810c19729de860eb"
+    reviewRequest:
+      summary: Đánh giá thợ
+      value:
+        workerId: "507f191e810c19729de860ea"
+        rating: 5
+        comment: "Làm việc nhanh, chu đáo."
+    chatCreateConversation:
+      summary: Mở chat với thợ
+      value:
+        recipientId: "507f191e810c19729de860ea"
+        jobId: "507f1f77bcf86cd799439011"
+    chatImage:
+      summary: Gửi ảnh base64 (rút gọn)
+      value:
+        imageBase64: "/9j/4AAQSkZJRg..."
+        mimeType: "image/jpeg"
+
+paths:
+  /:
+    get:
+      summary: Health check
+      tags: [Auth]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  docs: { type: string }
+                  openapi: { type: string }
+              example:
+                message: Connect successful
+                docs: "/reference"
+                openapi: "/openapi.yaml"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+            examples:
+              khach:
+                $ref: "#/components/examples/loginRequest"
+              tho:
+                $ref: "#/components/examples/loginWorker"
+            example:
+              email: khach@example.com
+              password: "Abc12345"
+      responses:
+        "200":
+          description: Thành công (accessToken, refreshToken, ...)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJyb2xlIjoiY3VzdG9tZXIifQ.example"
+                refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh.example"
+                user:
+                  _id: "507f1f77bcf86cd799439011"
+                  name: "Nguyễn Văn A"
+                  email: "khach@example.com"
+                  role: "customer"
+        "400":
+          description: Lỗi validation / đăng nhập
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+              example:
+                message: "Email hoặc mật khẩu không đúng"
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Đăng ký
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, confirm_password]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 6 }
+                confirm_password: { type: string }
+                location:
+                  $ref: "#/components/schemas/Location"
+            example:
+              name: "Trần Thị B"
+              email: "newuser@example.com"
+              password: "MatKhau1A"
+              confirm_password: "MatKhau1A"
+              location:
+                lat: 21.0285
+                lng: 105.8542
+            examples:
+              dangKy:
+                $ref: "#/components/examples/registerRequest"
+      responses:
+        "201":
+          description: Đã tạo tài khoản
+          content:
+            application/json:
+              example:
+                message: "Đăng ký thành công. Vui lòng xác thực email."
+                userId: "507f1f77bcf86cd799439011"
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Xác thực email (body OTP)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emailVerifyToken]
+              properties:
+                emailVerifyToken: { type: string }
+            example:
+              emailVerifyToken: "a1b2c3d4e5f6789012345678901234567890abcdef"
+    get:
+      tags: [Auth]
+      summary: Xác thực email (link)
+      parameters:
+        - in: query
+          name: token
+          schema: { type: string }
+          required: true
+
+  /auth/resend-verify-email:
+    post:
+      tags: [Auth]
+      summary: Gửi lại email xác thực
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+            example:
+              email: "newuser@example.com"
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Quên mật khẩu
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+            example:
+              email: "khach@example.com"
+
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Xác thực OTP (quên mật khẩu)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string, minLength: 6, maxLength: 6 }
+            example:
+              email: "khach@example.com"
+              otp: "482916"
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Đặt lại mật khẩu
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, password, confirm_password]
+              properties:
+                email: { type: string, format: email }
+                otp: { type: string }
+                password: { type: string }
+                confirm_password: { type: string }
+            example:
+              email: "khach@example.com"
+              otp: "482916"
+              password: "MatKhauMoi2B"
+              confirm_password: "MatKhauMoi2B"
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Làm mới access token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+            example:
+              refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh.long.example"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Đăng xuất
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Đã đăng xuất
+          content:
+            application/json:
+              example:
+                message: "Đăng xuất thành công"
+
+  /auth/google-token:
+    post:
+      tags: [Auth]
+      summary: Đăng nhập Google (idToken)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string }
+            example:
+              idToken: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiIuLi4ifQ.signature"
+
+  /jobs:
+    get:
+      tags: [Jobs]
+      summary: Job gần vị trí (public)
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema: { type: number }
+          example: 21.0285
+        - in: query
+          name: lng
+          required: true
+          schema: { type: number }
+          example: 105.8542
+        - in: query
+          name: radiusKm
+          schema: { type: number, default: 10 }
+          example: 15
+      responses:
+        "200":
+          description: Danh sách job
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/JobListItem"
+              example:
+                success: true
+                data:
+                  - _id: "507f1f77bcf86cd799439011"
+                    title: "Sửa chữa điện nước tại nhà"
+                    description: "Thay ổ cắm, kiểm tra aptomat"
+                    price: 500000
+                    status: "open"
+                    assignedWorkers: 0
+                    requiredWorkers: 2
+                    location:
+                      lat: 21.0285
+                      lng: 105.8542
+                    address: "Quận Ba Đình, Hà Nội"
+                    scheduledAt: "2026-03-25T08:00:00.000Z"
+                    skillTags: ["điện", "sửa chữa"]
+        "400":
+          description: Thiếu lat/lng
+          content:
+            application/json:
+              example:
+                success: false
+                message: "Query lat and lng are required"
+
+    post:
+      tags: [Jobs]
+      summary: Tạo job (customer)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, price, location, scheduledAt, requiredWorkers]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                price: { type: number }
+                location:
+                  $ref: "#/components/schemas/Location"
+                address: { type: string }
+                scheduledAt: { type: string, format: date-time }
+                requiredWorkers: { type: integer, minimum: 1 }
+                skillTags:
+                  type: array
+                  items: { type: string }
+            example:
+              title: "Lắp đặt camera an ninh"
+              description: "Lắp 4 camera IP, dây đi ngầm, bảo hành 12 tháng"
+              price: 3500000
+              location:
+                lat: 21.0285
+                lng: 105.8542
+              address: "Ngõ 10, phố Láng Hạ, Đống Đa, Hà Nội"
+              scheduledAt: "2026-04-01T09:00:00.000Z"
+              requiredWorkers: 2
+              skillTags: ["camera", "điện nhẹ"]
+            examples:
+              taoTin:
+                $ref: "#/components/examples/createJobRequest"
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  _id: "507f1f77bcf86cd799439011"
+                  title: "Lắp đặt camera an ninh"
+                  status: "pending"
+                  createdBy: "507f191e810c19729de860ea"
+
+  /jobs/browse:
+    get:
+      tags: [Jobs]
+      summary: Duyệt job (worker)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+          example: "điện"
+        - in: query
+          name: status
+          schema: { type: string }
+          example: "open,partial,full"
+        - in: query
+          name: minPrice
+          schema: { type: number }
+        - in: query
+          name: maxPrice
+          schema: { type: number }
+        - in: query
+          name: skillTags
+          schema: { type: string }
+        - in: query
+          name: lat
+          schema: { type: number }
+        - in: query
+          name: lng
+          schema: { type: number }
+        - in: query
+          name: radiusKm
+          schema: { type: number }
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [price_asc, price_desc, date_desc, date_asc, distance]
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 500 }
+          example: 20
+      responses:
+        "200":
+          description: Danh sách có phân trang
+          content:
+            application/json:
+              example:
+                success: true
+                items:
+                  - _id: "507f1f77bcf86cd799439011"
+                    title: "Sơn nhà 3 tầng"
+                    price: 12000000
+                    status: "open"
+                    distanceKm: 2.4
+                page: 1
+                limit: 20
+                total: 42
+
+  /jobs/pending:
+    get:
+      tags: [Jobs]
+      summary: Job chờ duyệt (admin)
+      security: [{ bearerAuth: [] }]
+
+  /jobs/recommended:
+    get:
+      tags: [Jobs]
+      summary: Job gợi ý (worker)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: lat
+          schema: { type: number }
+        - in: query
+          name: lng
+          schema: { type: number }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: radiusKm
+          schema: { type: number }
+
+  /jobs/mine:
+    get:
+      tags: [Jobs]
+      summary: Job của tôi (customer)
+      security: [{ bearerAuth: [] }]
+
+  /jobs/{id}:
+    get:
+      tags: [Jobs]
+      summary: Chi tiết job
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          example: "507f1f77bcf86cd799439011"
+      responses:
+        "200":
+          description: Chi tiết
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  _id: "507f1f77bcf86cd799439011"
+                  title: "Sửa chữa điện nước tại nhà"
+                  description: "Thay ổ cắm, kiểm tra aptomat"
+                  price: 500000
+                  status: "open"
+                  assignedWorkers: 1
+                  requiredWorkers: 2
+                  location:
+                    lat: 21.0285
+                    lng: 105.8542
+                  address: "Quận Ba Đình, Hà Nội"
+                  scheduledAt: "2026-03-25T08:00:00.000Z"
+                  skillTags: ["điện"]
+    patch:
+      tags: [Jobs]
+      summary: Cập nhật job (customer)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                price: { type: number }
+                location:
+                  $ref: "#/components/schemas/Location"
+                address: { type: string }
+                scheduledAt: { type: string }
+                requiredWorkers: { type: integer }
+                skillTags:
+                  type: array
+                  items: { type: string }
+            example:
+              title: "Sửa chữa điện nước (cập nhật)"
+              price: 550000
+              address: "Số 12, ngõ Văn Cao, Ba Đình"
+    delete:
+      tags: [Jobs]
+      summary: Xóa job (customer)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /jobs/{id}/applicants:
+    get:
+      tags: [Jobs]
+      summary: Danh sách ứng viên (customer)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /jobs/{id}/reviews:
+    get:
+      tags: [Jobs]
+      summary: Danh sách đánh giá job
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+    post:
+      tags: [Jobs]
+      summary: Tạo đánh giá thợ (chủ job)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerId, rating]
+              properties:
+                workerId: { type: string }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string }
+            example:
+              workerId: "507f191e810c19729de860ea"
+              rating: 5
+              comment: "Thợ đúng giờ, gọn gàng."
+            examples:
+              danhGia:
+                $ref: "#/components/examples/reviewRequest"
+
+  /jobs/{id}/select-workers:
+    post:
+      tags: [Jobs]
+      summary: Chọn ứng viên (customer)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workerIds]
+              properties:
+                workerIds:
+                  type: array
+                  items: { type: string }
+            example:
+              workerIds:
+                - "507f191e810c19729de860ea"
+                - "507f191e810c19729de860eb"
+            examples:
+              chon2Tho:
+                $ref: "#/components/examples/selectWorkersRequest"
+
+  /jobs/{id}/complete:
+    patch:
+      tags: [Jobs]
+      summary: Hoàn thành job (customer)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /jobs/{id}/approve:
+    patch:
+      tags: [Jobs]
+      summary: Duyệt job (admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /apply:
+    post:
+      tags: [Apply]
+      summary: Ứng tuyển (worker)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId]
+              properties:
+                jobId: { type: string }
+                priceOffer: { type: number }
+            example:
+              jobId: "507f1f77bcf86cd799439011"
+              priceOffer: 3200000
+            examples:
+              ungTuyen:
+                $ref: "#/components/examples/applyRequest"
+      responses:
+        "201":
+          description: Đã gửi đơn
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  _id: "507f1f77bcf86cd799439099"
+                  jobId: "507f1f77bcf86cd799439011"
+                  workerId: "507f191e810c19729de860ea"
+                  status: "pending"
+
+  /apply/me:
+    get:
+      tags: [Apply]
+      summary: Đơn ứng tuyển của tôi (worker)
+      security: [{ bearerAuth: [] }]
+
+  /apply/{id}:
+    delete:
+      tags: [Apply]
+      summary: Hủy đơn ứng tuyển (worker)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /review/job/{jobId}:
+    get:
+      tags: [Review]
+      summary: Đánh giá theo job
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema: { type: string }
+
+  /review:
+    post:
+      tags: [Review]
+      summary: Tạo đánh giá
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jobId, workerId, rating]
+              properties:
+                jobId: { type: string }
+                workerId: { type: string }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                comment: { type: string }
+            example:
+              jobId: "507f1f77bcf86cd799439011"
+              workerId: "507f191e810c19729de860ea"
+              rating: 4
+              comment: "Ổn, có thể hợp tác lần sau."
+
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Lấy profile
+      security: [{ bearerAuth: [] }]
+    patch:
+      tags: [Profile]
+      summary: Cập nhật profile
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatar: { type: string, format: uri }
+                location:
+                  $ref: "#/components/schemas/Location"
+            example:
+              name: "Nguyễn Văn A"
+              avatar: "https://example.com/avatar.jpg"
+              location:
+                lat: 21.0285
+                lng: 105.8542
+
+  /profile/change-password:
+    patch:
+      tags: [Profile]
+      summary: Đổi mật khẩu
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword, confirmNewPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string }
+                confirmNewPassword: { type: string }
+            example:
+              currentPassword: "Abc12345"
+              newPassword: "MatKhauMoi3C"
+              confirmNewPassword: "MatKhauMoi3C"
+
+  /profile/upload-avatar:
+    post:
+      tags: [Profile]
+      summary: Upload avatar (multipart field avatar)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+
+  /users/workers:
+    get:
+      tags: [Users]
+      summary: Danh sách thợ
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, maximum: 50 }
+          example: 10
+        - in: query
+          name: search
+          schema: { type: string }
+          example: "sơn"
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                items:
+                  - _id: "507f191e810c19729de860ea"
+                    name: "Lê Văn Thợ"
+                    rating: 4.8
+                    completedJobs: 32
+                    skills: ["điện", "nước"]
+                    avatar: "/uploads/avatar-abc.jpg"
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Thông tin user hiện tại
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                user:
+                  _id: "507f1f77bcf86cd799439011"
+                  name: "Nguyễn Văn A"
+                  email: "khach@example.com"
+                  role: "customer"
+                  avatar: "/uploads/avatar.jpg"
+
+  /chat/unread:
+    get:
+      tags: [Chat]
+      summary: Tổng tin chưa đọc
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                unreadCount: 3
+
+  /chat/conversations:
+    get:
+      tags: [Chat]
+      summary: Danh sách hội thoại
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                conversations:
+                  - _id: "507f1f77bcf86cd7994390aa"
+                    lastMessage: "Em tới lúc 8h sáng nhé"
+                    updatedAt: "2026-03-24T10:00:00.000Z"
+    post:
+      tags: [Chat]
+      summary: Tạo / mở hội thoại
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipientId]
+              properties:
+                recipientId: { type: string }
+                jobId: { type: string }
+            example:
+              recipientId: "507f191e810c19729de860ea"
+              jobId: "507f1f77bcf86cd799439011"
+            examples:
+              moChat:
+                $ref: "#/components/examples/chatCreateConversation"
+      responses:
+        "201":
+          content:
+            application/json:
+              example:
+                success: true
+                conversation:
+                  _id: "507f1f77bcf86cd7994390aa"
+                  participants: ["507f1f77bcf86cd799439011", "507f191e810c19729de860ea"]
+
+  /chat/conversations/{id}/messages:
+    get:
+      tags: [Chat]
+      summary: Tin nhắn trong hội thoại
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+
+  /chat/conversations/{id}/read:
+    post:
+      tags: [Chat]
+      summary: Đánh dấu đã đọc
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /chat/conversations/{id}/image:
+    post:
+      tags: [Chat]
+      summary: Gửi ảnh (base64)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          example: "507f1f77bcf86cd7994390aa"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageBase64]
+              properties:
+                imageBase64: { type: string }
+                mimeType: { type: string }
+            examples:
+              anh:
+                $ref: "#/components/examples/chatImage"
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: Danh sách thông báo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+          example: 1
+        - in: query
+          name: limit
+          schema: { type: integer }
+          example: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                items:
+                  - _id: "507f1f77bcf86cd7994390bb"
+                    title: "Có ứng viên mới"
+                    body: "Worker Lê Văn Đã ứng tuyển job của bạn"
+                    read: false
+                    createdAt: "2026-03-24T09:00:00.000Z"
+                page: 1
+                total: 5
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Số thông báo chưa đọc
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                unreadCount: 2
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Đánh dấu tất cả đã đọc
+      security: [{ bearerAuth: [] }]
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Đánh dấu một thông báo đã đọc
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /notifications/{id}:
+    delete:
+      tags: [Notifications]
+      summary: Xóa thông báo
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+
+  /admin/overview:
+    get:
+      tags: [Admin]
+      summary: Thống kê tổng quan
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                success: true
+                data:
+                  totalUsers: 128
+                  totalJobs: 456
+                  pendingJobs: 12
+
+  /admin/meta/categories:
+    get:
+      tags: [Admin]
+      summary: Danh mục dịch vụ
+      security: [{ bearerAuth: [] }]
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: Danh sách user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: role
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+    post:
+      tags: [Admin]
+      summary: Tạo user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, confirm_password]
+              properties:
+                name: { type: string }
+                email: { type: string }
+                password: { type: string }
+                confirm_password: { type: string }
+                role: { type: string }
+                isVerified: { type: boolean }
+            example:
+              name: "Admin Phụ"
+              email: "admin.phu@example.com"
+              password: "AdminPass1A"
+              confirm_password: "AdminPass1A"
+              role: "worker"
+              isVerified: true
+
+  /admin/users/{id}:
+    patch:
+      tags: [Admin]
+      summary: Cập nhật user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string }
+                role: { type: string }
+                isVerified: { type: boolean }
+                isDeleted: { type: boolean }
+
+  /admin/jobs:
+    get:
+      tags: [Admin]
+      summary: Danh sách job (admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: search
+          schema: { type: string }
+
+  /admin/jobs/{id}:
+    delete:
+      tags: [Admin]
+      summary: Xóa job (admin)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
