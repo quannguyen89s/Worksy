@@ -1,9 +1,16 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { BASE_URL, onUnauthorized } from './api';
 
 let socket: Socket | null = null;
 let pending: Promise<Socket> | null = null;
+
+async function getAccessToken() {
+  const secureToken = await SecureStore.getItemAsync('accessToken');
+  if (secureToken) return secureToken;
+  return AsyncStorage.getItem('token');
+}
 
 export async function connectSocket(): Promise<Socket> {
   if (socket?.connected) return socket;
@@ -16,7 +23,7 @@ export async function connectSocket(): Promise<Socket> {
       socket = null;
     }
 
-    const token = await AsyncStorage.getItem('token');
+    const token = await getAccessToken();
 
     const newSocket = io(BASE_URL, {
       auth: { token: token ?? '' },
@@ -35,7 +42,11 @@ export async function connectSocket(): Promise<Socket> {
       console.error('[Socket] error', err.message);
       // Token không hợp lệ / hết hạn → tự động đăng xuất
       if (err.message.includes('Token') || err.message.includes('Xác thực')) {
-        await AsyncStorage.multiRemove(['token', 'user']);
+        await Promise.all([
+          AsyncStorage.multiRemove(['token', 'refreshToken', 'user']),
+          SecureStore.deleteItemAsync('accessToken'),
+          SecureStore.deleteItemAsync('refreshToken'),
+        ]);
         disconnectSocket();
         onUnauthorized?.();
       }

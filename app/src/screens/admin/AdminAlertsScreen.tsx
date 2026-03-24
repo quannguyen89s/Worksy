@@ -87,6 +87,19 @@ export default function AdminAlertsScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + 90 }}>
         {data ? (
           <>
+            <TouchableOpacity
+              style={styles.jobAlertCard}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('AdminJobs')}>
+              <View style={styles.jobAlertIcon}>
+                <Ionicons name="briefcase-outline" size={22} color={adminTheme.brownMid} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.jobAlertTitle}>Có {data.jobsOpen} job cần phê duyệt</Text>
+                <Text style={styles.jobAlertSub}>Nhấn để đi tới trang Việc làm và duyệt nhanh.</Text>
+              </View>
+            </TouchableOpacity>
+
             <Text style={styles.sectionTitle}>Cần phê duyệt</Text>
             {data.pendingApprovals.length === 0 ? (
               <Text style={styles.emptyText}>Không có mục chờ xử lý.</Text>
@@ -187,6 +200,28 @@ const styles = StyleSheet.create({
   },
   pendingTitle: { fontSize: 16, fontWeight: '700', color: adminTheme.brown },
   pendingSub: { fontSize: 13, color: adminTheme.brownMuted, marginTop: 4 },
+  jobAlertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: adminTheme.card,
+    borderRadius: 22,
+    padding: 16,
+    marginTop: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: adminTheme.borderSoft,
+    gap: 14,
+  },
+  jobAlertIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${adminTheme.brownMid}22`,
+  },
+  jobAlertTitle: { fontSize: 16, fontWeight: '800', color: adminTheme.brown },
+  jobAlertSub: { fontSize: 13, color: adminTheme.brownMuted, marginTop: 4 },
   timelineCard: {
     backgroundColor: adminTheme.timelineBg,
     borderRadius: 24,

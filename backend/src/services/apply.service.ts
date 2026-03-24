@@ -71,8 +71,8 @@ export async function createApply(
     const customerNotification = await notificationService.create(
       String(job.createdBy),
       "job_application",
-      "Co nguoi ung tuyen moi",
-      `Cong viec "${String(job.title ?? "Cong viec")}" vua co ung tuyen moi.`,
+      "Có người ứng tuyển mới",
+      `Công việc "${String(job.title ?? "Công việc")}" vừa có ứng tuyển mới.`,
       {
         jobId: String(job._id),
         applicationId: String(doc._id),
@@ -84,8 +84,8 @@ export async function createApply(
     const workerNotification = await notificationService.create(
       workerId,
       "job_application",
-      "Da gui ung tuyen",
-      `Ban da gui ung tuyen vao cong viec "${String(job.title ?? "Cong viec")}".`,
+      "Đã gửi ứng tuyển",
+      `Bạn đã gửi ứng tuyển vào công việc "${String(job.title ?? "Công việc")}".`,
       {
         jobId: String(job._id),
         applicationId: String(doc._id),
