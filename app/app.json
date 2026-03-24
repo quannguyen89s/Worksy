@@ -1,30 +1,37 @@
 {
   "expo": {
+    "scheme": "worksy",
     "name": "Worksy",
     "slug": "Worksy",
     "version": "1.0.0",
-
+    "updates": {
+      "enabled": false
+    },
     "web": {
+      "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
-
     "experiments": {
       "tsconfigPaths": true
     },
-
-    "plugins": [],
-
+    "plugins": [
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin",
+      "expo-secure-store"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-
     "userInterfaceStyle": "light",
-
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      
+      "**/*"
+    
+    ],
     "ios": {
       "supportsTablet": true
     },
