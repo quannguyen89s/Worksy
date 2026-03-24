@@ -12,11 +12,14 @@ export const getProfileService = async (userId: string) => {
     return user;
 };
 
-export const updateProfileService = async (userId: string, updateData: { name?: string; avatar?: string }) => {
+export const updateProfileService = async (
+    userId: string,
+    updateData: { name?: string; avatar?: string; location?: { lat: number; lng: number } },
+) => {
     const user = await userModel.findByIdAndUpdate(
         userId,
         { $set: updateData },
-        { new: true, runValidators: true }
+        { new: true, runValidators: true },
     ).select("-password -refreshToken -emailVerifyToken -forgotPasswordOTP -forgotPasswordOTPExpiry -__v");
 
     if (!user) {

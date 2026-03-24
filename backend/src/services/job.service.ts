@@ -38,6 +38,15 @@ function jobPoint(job: { location?: { lat?: number; lng?: number } | null }) {
   };
 }
 
+/** Job có location hợp lệ (không null và không phải 0,0 - tọa độ mặc định khi thiếu). */
+function hasValidLocation(job: { location?: { lat?: number; lng?: number } | null }): boolean {
+  const lat = job.location?.lat;
+  const lng = job.location?.lng;
+  if (lat == null || lng == null) return false;
+  if (lat === 0 && lng === 0) return false;
+  return Number.isFinite(lat) && Number.isFinite(lng);
+}
+
 function syncJobStatus(doc: {
   requiredWorkers: number;
   assignedWorkers: number;
@@ -116,13 +125,19 @@ export async function listJobsForWorker(filters: WorkerBrowseFilters) {
   // Lọc theo khoảng cách nếu có lat, lng
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
     const userPoint = { lat: lat!, lng: lng! };
+    const isGetAllMode = radiusKm > 500; // radiusKm=9999 = lấy tất cả, filter "gần tôi" ở client
     jobs = jobs
       .map((j) => {
+        if (!hasValidLocation(j)) {
+          if (isGetAllMode) return { ...j } as unknown as (typeof j & { distanceKm?: number });
+          return null;
+        }
         const jl = jobPoint(j);
         const distanceKm = haversineKm(userPoint, jl);
-        return { ...j, distanceKm };
+        if (distanceKm <= radiusKm || isGetAllMode) return { ...j, distanceKm };
+        return null;
       })
-      .filter((j) => j.distanceKm <= radiusKm);
+      .filter((j): j is NonNullable<typeof j> => j != null);
   }
 
   // Sort
@@ -183,11 +198,17 @@ export async function createJob(
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    address?: string;
     scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
   },
 ) {
+  // Không cho lưu tọa độ (0,0) - thường là lỗi/placeholder
+  const { lat, lng } = body.location ?? {};
+  if (lat === 0 && lng === 0) {
+    throw new AppError("Vị trí không hợp lệ. Vui lòng chọn địa chỉ hoặc lấy vị trí hiện tại.", 400);
+  }
   const schedule = new Date(body.scheduledAt);
   if (Number.isNaN(schedule.getTime())) {
     throw new AppError("scheduledAt is invalid", 400);
@@ -197,6 +218,7 @@ export async function createJob(
     description: body.description,
     price: body.price,
     location: body.location,
+    address: body.address ?? "",
     scheduledAt: schedule,
     requiredWorkers: body.requiredWorkers,
     skillTags: body.skillTags ?? [],
@@ -329,11 +351,14 @@ export async function listPendingJobs() {
     .lean();
 }
 
+const NEAR_ME_RADIUS_KM = 20;
+
 export async function listRecommendedJobs(
   workerId: string,
   lat?: number,
   lng?: number,
   limit = 20,
+  radiusKm = NEAR_ME_RADIUS_KM,
 ) {
   const worker = await userModel.findById(workerId).lean();
   if (!worker) throw new AppError("Worker not found", 404);
@@ -343,19 +368,22 @@ export async function listRecommendedJobs(
   const jobs = await jobModel
     .find({ status: "open", isDeleted: { $ne: true } })
     .lean();
-  const scored = jobs.map((j) => {
-    const jl = jobPoint(j);
-    const distanceKm = haversineKm({ lat: wLat, lng: wLng }, jl);
-    const recommendationScoreVal = recommendationScore({
-      jobTags: j.skillTags ?? [],
-      workerSkills: skills,
-      jobPrice: j.price,
-      distanceKm,
+  const scored = jobs
+    .filter((j) => hasValidLocation(j))
+    .map((j) => {
+      const jl = jobPoint(j);
+      const distanceKm = haversineKm({ lat: wLat, lng: wLng }, jl);
+      const recommendationScoreVal = recommendationScore({
+        jobTags: j.skillTags ?? [],
+        workerSkills: skills,
+        jobPrice: j.price,
+        distanceKm,
+      });
+      return { ...j, distanceKm, recommendationScore: recommendationScoreVal };
     });
-    return { ...j, distanceKm, recommendationScore: recommendationScoreVal };
-  });
-  scored.sort((a, b) => b.recommendationScore - a.recommendationScore);
-  return scored.slice(0, limit);
+  const withinRadius = scored.filter((j) => ((j as { distanceKm?: number }).distanceKm ?? Infinity) <= radiusKm);
+  withinRadius.sort((a, b) => b.recommendationScore - a.recommendationScore);
+  return withinRadius.slice(0, limit);
 }
 
 export async function listApplicantsRanked(jobId: string, customerId: string) {
@@ -537,6 +565,7 @@ export async function updateJob(
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    address?: string;
     scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
@@ -562,6 +591,12 @@ export async function updateJob(
   if (body.requiredWorkers !== undefined && body.requiredWorkers < 1) {
     throw new AppError("requiredWorkers must be >= 1", 400);
   }
+  if (body.location !== undefined) {
+    const { lat, lng } = body.location;
+    if (lat === 0 && lng === 0) {
+      throw new AppError("Vị trí không hợp lệ. Vui lòng chọn địa chỉ hoặc lấy vị trí hiện tại.", 400);
+    }
+  }
   if (body.scheduledAt !== undefined) {
     const schedule = new Date(body.scheduledAt);
     if (Number.isNaN(schedule.getTime())) {
@@ -573,6 +608,7 @@ export async function updateJob(
   if (body.description !== undefined) job.description = body.description;
   if (body.price !== undefined) job.price = body.price;
   if (body.location !== undefined) job.location = body.location;
+  if (body.address !== undefined) job.address = body.address;
   if (body.requiredWorkers !== undefined) job.requiredWorkers = body.requiredWorkers;
   if (body.skillTags !== undefined) job.skillTags = body.skillTags;
   await job.save();

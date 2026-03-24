@@ -23,11 +23,14 @@ export const getProfileController = async (req: Request, res: Response) => {
 export const updateProfileController = async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
-        const { name, avatar } = req.body;
+        const { name, avatar, location } = req.body;
 
-        const updateData: { name?: string; avatar?: string } = {};
+        const updateData: { name?: string; avatar?: string; location?: { lat: number; lng: number } } = {};
         if (name !== undefined) updateData.name = name;
         if (avatar !== undefined) updateData.avatar = avatar;
+        if (location !== undefined && typeof location.lat === "number" && typeof location.lng === "number") {
+            updateData.location = { lat: location.lat, lng: location.lng };
+        }
 
         const profile = await updateProfileService(userId, updateData);
         return res.status(HTTP_STATUS.OK).json({ message: "Update profile successful", result: profile });

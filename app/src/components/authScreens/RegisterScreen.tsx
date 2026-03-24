@@ -15,7 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { Toast } from '@/components/ToastProvider';
+import LocationMapPicker from '@/components/LocationMapPicker';
 import { COLORS } from '@/theme/colors';
 import authService from '@/services/authService';
 
@@ -35,6 +37,9 @@ export default function RegisterScreen({ navigation }: any) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
@@ -65,7 +70,7 @@ export default function RegisterScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      await authService.register(name.trim(), email.trim(), password, confirmPassword);
+      await authService.register(name.trim(), email.trim(), password, confirmPassword, userLocation ?? undefined);
       Toast.show({ type: 'success', title: 'Success', message: 'Registration successful! Please check your email to verify.' });
       setTimeout(() => navigation.navigate('Login'), 2000);
     } catch (error: any) {
@@ -220,6 +225,84 @@ export default function RegisterScreen({ navigation }: any) {
                   <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#9CA3AF" />
                 </TouchableOpacity>
               }
+            />
+
+            {/* Lấy vị trí để tìm việc gần bạn */}
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: '#6B7280', marginBottom: 10 }}>
+                Vị trí (để tìm việc gần bạn)
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={async () => {
+                    setLoadingLocation(true);
+                    try {
+                      const { status } = await Location.requestForegroundPermissionsAsync();
+                      if (status !== 'granted') {
+                        Toast.show({ type: 'error', title: 'Thất bại', message: 'Cần quyền truy cập vị trí' });
+                        return;
+                      }
+                      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                      Toast.show({ type: 'success', title: 'Thành công', message: 'Đã lấy vị trí của bạn' });
+                    } catch (e) {
+                      Toast.show({ type: 'error', title: 'Lỗi', message: 'Không thể lấy vị trí' });
+                    } finally {
+                      setLoadingLocation(false);
+                    }
+                  }}
+                  disabled={loadingLocation}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 16,
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                    borderColor: userLocation ? '#059669' : '#E5E7EB',
+                    backgroundColor: userLocation ? '#D1FAE5' : '#F9FAFB',
+                  }}
+                >
+                  <Ionicons name="location" size={22} color={userLocation ? '#059669' : '#9CA3AF'} style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }} numberOfLines={1}>
+                      {userLocation ? 'Đã lấy vị trí' : 'Vị trí hiện tại'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }} numberOfLines={1}>
+                      {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Bấm để lấy'}
+                    </Text>
+                  </View>
+                  {loadingLocation ? <ActivityIndicator size="small" color={ACCENT} /> : null}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowMapPicker(true)}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 16,
+                    borderRadius: 14,
+                    borderWidth: 1.5,
+                    borderColor: userLocation ? '#059669' : '#E5E7EB',
+                    backgroundColor: userLocation ? '#D1FAE5' : '#F9FAFB',
+                  }}
+                >
+                  <Ionicons name="map" size={22} color={userLocation ? '#059669' : '#9CA3AF'} style={{ marginRight: 12 }} />
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: '#111827' }}>
+                    Chọn trên bản đồ
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <LocationMapPicker
+              visible={showMapPicker}
+              onClose={() => setShowMapPicker(false)}
+              initialLocation={userLocation}
+              onConfirm={(r) => {
+                setUserLocation({ lat: r.lat, lng: r.lng });
+                Toast.show({ type: 'success', title: 'Thành công', message: 'Đã chọn vị trí' });
+                setShowMapPicker(false);
+              }}
             />
 
             {/* Register Button */}

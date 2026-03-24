@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,16 +19,20 @@ import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
 import * as jobApi from '@/api/jobApi';
 import { COLORS } from '@/theme/colors';
+import profileService from '@/services/profileService';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const CARD_GAP = 10;
-const LIMIT_PER_PAGE = 10;
-const DEBOUNCE_MS = 400;
+const FETCH_ALL_LIMIT = 500; // Số job tối đa fetch 1 lần (filter client-side)
+const FETCH_DEBOUNCE_MS = 150;
+/** Bán kính "Việc gần tôi": khoảng cách từ vị trí worker đến vị trí job < 20 km */
+const NEAR_ME_RADIUS_KM = 20;
 const PAD = 16;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = Math.floor((SCREEN_WIDTH - PAD * 2 - CARD_GAP) / 2);
@@ -43,13 +47,14 @@ const SORT_OPTIONS: { id: jobApi.BrowseJobsParams['sort']; label: string }[] = [
   { id: 'date_asc', label: 'Cũ nhất' },
   { id: 'price_asc', label: 'Giá tăng dần' },
   { id: 'price_desc', label: 'Giá giảm dần' },
+  { id: 'distance', label: 'Gần nhất' },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
   open: 'Đang tuyển',
   full: 'Đã đủ',
   pending: 'Chờ duyệt',
-  done: 'Hoàn thành', 
+  done: 'Hoàn thành',
 };
 
 const COMPLETION_SOURCE_LABELS: Record<string, string> = {
@@ -62,9 +67,7 @@ export default function BrowseJobsScreen() {
   const insets = useSafeAreaInsets();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [accessToken, setAccessToken] = useState('');
-  const [jobs, setJobs] = useState<jobApi.Job[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [allJobs, setAllJobs] = useState<jobApi.Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
@@ -80,47 +83,149 @@ export default function BrowseJobsScreen() {
     sort: 'date_desc' as jobApi.BrowseJobsParams['sort'],
   });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [nearMeMode, setNearMeMode] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [deviceLocation, setDeviceLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [recommendedJobs, setRecommendedJobs] = useState<jobApi.Job[]>([]);
+  const [loadingRecommended, setLoadingRecommended] = useState(false);
+
+  const activeLocation = userLocation || deviceLocation;
 
   const loadToken = useCallback(async () => {
     const token = await SecureStore.getItemAsync('accessToken');
     setAccessToken(token ?? '');
   }, []);
 
-  const fetchJobs = useCallback(
-    async (pageNum: number = 1) => {
+  const loadUserLocation = useCallback(async () => {
+    try {
+      const res = await profileService.getProfile();
+      const p = res?.result;
+      if (p?.location?.lat != null && p?.location?.lng != null) {
+        setUserLocation({ lat: p.location.lat, lng: p.location.lng });
+      }
+    } catch {
+      setUserLocation(null);
+    }
+  }, []);
+
+  const getDeviceLocation = useCallback(async () => {
+    setLoadingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần quyền', 'Cho phép truy cập vị trí để tìm việc gần bạn');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setDeviceLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setNearMeMode(true);
+    } catch {
+      Alert.alert('Lỗi', 'Không thể lấy vị trí');
+    } finally {
+      setLoadingLocation(false);
+    }
+  }, []);
+
+  /** Fetch tất cả job khi vào / refresh - không áp filter (filter ở client) */
+  const fetchAllJobs = useCallback(
+    async () => {
       if (!accessToken.trim()) {
-        setJobs([]);
-        setTotal(0);
+        setAllJobs([]);
         return;
       }
       setLoading(true);
       try {
         const params: jobApi.BrowseJobsParams = {
-          search: search.trim() || undefined,
-          status: filters.statusIds.length ? filters.statusIds.join(',') : 'open,partial,full',
-          sort: filters.sort,
-          page: pageNum,
-          limit: LIMIT_PER_PAGE,
+          status: 'open,partial,full',
+          sort: activeLocation ? 'distance' : 'date_desc',
+          page: 1,
+          limit: FETCH_ALL_LIMIT,
         };
-        if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
-        if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
-        if (filters.skillTags.trim()) {
-          params.skillTags = filters.skillTags.split(',').map((s) => s.trim()).filter(Boolean).join(',');
+        if (activeLocation) {
+          params.lat = activeLocation.lat;
+          params.lng = activeLocation.lng;
+          params.radiusKm = 9999; // Lấy tất cả, filter "gần tôi" ở client
         }
         const result = await jobApi.browseJobs(accessToken, params);
-        setJobs(result.data);
-        setTotal(result.total);
-        setPage(result.page);
+        setAllJobs(result.data ?? []);
       } catch {
-        setJobs([]);
-        setTotal(0);
+        setAllJobs([]);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [accessToken, search, filters],
+    [accessToken, activeLocation],
   );
+
+  /** Filter client-side theo search, status, price, skillTags, nearMeMode, sort */
+  const filteredJobs = useMemo(() => {
+    let list = [...allJobs];
+
+    // Search
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (j) =>
+          (j.title ?? '').toLowerCase().includes(q) ||
+          (j.description ?? '').toLowerCase().includes(q) ||
+          (j.skillTags ?? []).some((t) => String(t).toLowerCase().includes(q)),
+      );
+    }
+
+    // Status
+    if (filters.statusIds.length > 0) {
+      list = list.filter((j) => filters.statusIds.includes(j.status));
+    }
+
+    // Price
+    const minP = filters.minPrice ? parseFloat(filters.minPrice) : NaN;
+    const maxP = filters.maxPrice ? parseFloat(filters.maxPrice) : NaN;
+    if (Number.isFinite(minP)) list = list.filter((j) => (j.price ?? 0) >= minP);
+    if (Number.isFinite(maxP)) list = list.filter((j) => (j.price ?? 0) <= maxP);
+
+    // Skill tags
+    const tags = filters.skillTags.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (tags.length > 0) {
+      list = list.filter((j) =>
+        tags.some((t) => (j.skillTags ?? []).some((st) => String(st).toLowerCase().includes(t))),
+      );
+    }
+
+    // Việc gần tôi (dưới 20km)
+    if (nearMeMode) {
+      list = list.filter((j) => j.distanceKm != null && j.distanceKm <= NEAR_ME_RADIUS_KM);
+    }
+
+    // Sort
+    const sort = nearMeMode && activeLocation ? 'distance' : filters.sort;
+    if (sort === 'price_asc') list.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    else if (sort === 'price_desc') list.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    else if (sort === 'date_asc') list.sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+    else if (sort === 'date_desc') list.sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    else if (sort === 'distance' && activeLocation) list.sort((a, b) => ((a.distanceKm ?? 999) - (b.distanceKm ?? 999)));
+
+    return list;
+  }, [allJobs, search, filters, nearMeMode, activeLocation]);
+
+  const fetchRecommended = useCallback(async () => {
+    if (!accessToken.trim() || !activeLocation) return;
+    setLoadingRecommended(true);
+    try {
+      const data = await jobApi.listRecommendedJobs(accessToken, {
+        lat: activeLocation.lat,
+        lng: activeLocation.lng,
+        limit: 8,
+        radiusKm: NEAR_ME_RADIUS_KM,
+      });
+      setRecommendedJobs(data);
+    } catch {
+      setRecommendedJobs([]);
+    } finally {
+      setLoadingRecommended(false);
+    }
+  }, [accessToken, activeLocation]);
 
   const fetchMyApplies = useCallback(async () => {
     if (!accessToken.trim()) {
@@ -146,32 +251,38 @@ export default function BrowseJobsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadToken();
-    }, [loadToken]),
+      loadUserLocation();
+    }, [loadToken, loadUserLocation]),
   );
 
-  // Realtime search: debounce fetch when search/filters change
+  // Fetch tất cả job khi vào / khi có location (filter client-side)
   useEffect(() => {
     if (!accessToken) return;
     void fetchMyApplies();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      fetchJobs(1);
-    }, DEBOUNCE_MS);
+      fetchAllJobs();
+    }, FETCH_DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [accessToken, search, filters, fetchJobs, fetchMyApplies]);
+  }, [accessToken, activeLocation, fetchAllJobs, fetchMyApplies]);
+
+  // Fetch recommended when we have location
+  useEffect(() => {
+    if (accessToken && activeLocation) void fetchRecommended();
+    else setRecommendedJobs([]);
+  }, [accessToken, activeLocation, fetchRecommended]);
 
   const applyFilterAndClose = useCallback(() => {
     setShowFilter(false);
-    fetchJobs(1);
-  }, [fetchJobs]);
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchJobs(1);
-  }, [fetchJobs]);
+    fetchAllJobs();
+  }, [fetchAllJobs]);
 
   const toggleStatus = (id: string) => {
     setFilters((f) =>
@@ -228,7 +339,6 @@ export default function BrowseJobsScreen() {
     try {
       await jobApi.applyJob(accessToken.trim(), { jobId: job._id });
       Alert.alert('Thành công', 'Đã gửi đơn ứng tuyển.');
-      await fetchJobs(page);
       await fetchMyApplies();
     } catch (err: unknown) {
       Alert.alert('Lỗi', jobApi.getErrorMessage(err));
@@ -257,7 +367,6 @@ export default function BrowseJobsScreen() {
               await jobApi.cancelApply(accessToken.trim(), applyState.applyId);
               Alert.alert('Thành công', 'Đã hủy đơn ứng tuyển.');
               await fetchMyApplies();
-              await fetchJobs(page);
             } catch (err: unknown) {
               Alert.alert('Lỗi', jobApi.getErrorMessage(err));
             } finally {
@@ -308,6 +417,31 @@ export default function BrowseJobsScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        <View style={styles.nearMeRow}>
+          {activeLocation ? (
+            <TouchableOpacity
+              style={[styles.nearMeChip, nearMeMode && styles.nearMeChipActive]}
+              onPress={() => setNearMeMode(!nearMeMode)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="location" size={16} color={nearMeMode ? '#fff' : COLORS.primary} />
+              <Text style={[styles.nearMeChipText, nearMeMode && styles.nearMeChipTextActive]}>
+                Việc gần tôi (dưới {NEAR_ME_RADIUS_KM} km)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.getLocationBtn}
+              onPress={getDeviceLocation}
+              disabled={loadingLocation}
+            >
+              <Ionicons name="location-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.getLocationBtnText}>
+                {loadingLocation ? 'Đang lấy...' : 'Lấy vị trí để tìm việc gần bạn'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.viewModeRow}>
           <TouchableOpacity
             style={[styles.viewModeBtn, viewMode === 'grid' && styles.viewModeBtnActive]}
@@ -349,12 +483,47 @@ export default function BrowseJobsScreen() {
       {/* Job list */}
       <FlatList
         key={viewMode}
-        data={jobs}
+        data={filteredJobs}
         keyExtractor={(job) => job._id}
         numColumns={viewMode === 'grid' ? 2 : 1}
         style={styles.list}
-        contentContainerStyle={[styles.scrollContent, jobs.length === 0 && styles.emptyList]}
+        contentContainerStyle={[styles.scrollContent, filteredJobs.length === 0 && recommendedJobs.length === 0 && styles.emptyList]}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          recommendedJobs.length > 0 ? (
+            <View style={styles.recommendedSection}>
+              <Text style={styles.recommendedTitle}>Gợi ý cho bạn</Text>
+              <Text style={styles.recommendedSubtitle}>
+                Khoảng cách từ vị trí bạn đăng ký đến vị trí làm việc dưới {NEAR_ME_RADIUS_KM} km
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recommendedScroll}
+              >
+                {recommendedJobs.map((job) => (
+                  <TouchableOpacity
+                    key={job._id}
+                    style={styles.recommendedCard}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedJob(job)}
+                  >
+                    <Text style={styles.recommendedCardTitle} numberOfLines={2}>{job.title}</Text>
+                    <Text style={styles.recommendedCardPrice}>{job.price?.toLocaleString('vi-VN')} VNĐ</Text>
+                    {(job.distanceKm != null || job.address) && (
+                      <View style={styles.recommendedCardMeta}>
+                        <Ionicons name="location" size={12} color={COLORS.textMuted} />
+                        <Text style={styles.recommendedCardMetaText} numberOfLines={1}>
+                          {job.distanceKm != null ? `~${job.distanceKm.toFixed(1)} km` : job.address}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyState}>
@@ -402,6 +571,14 @@ export default function BrowseJobsScreen() {
                   {job.assignedWorkers}/{job.requiredWorkers} người
                 </Text>
               </View>
+              {(job.address?.trim() || job.distanceKm != null) ? (
+                <View style={styles.jobAddressRow}>
+                  <Ionicons name="location-outline" size={14} color={COLORS.textMuted} />
+                  <Text style={styles.jobAddressText} numberOfLines={1}>
+                    {job.distanceKm != null ? `~${job.distanceKm.toFixed(1)} km` : job.address}
+                  </Text>
+                </View>
+              ) : null}
               {job.scheduledAt ? (
                 <Text style={styles.jobScheduleText}>Lịch: {formatDateTime(job.scheduledAt)}</Text>
               ) : null}
@@ -605,6 +782,12 @@ export default function BrowseJobsScreen() {
                       {formatDateTime(selectedJob.scheduledAt)}
                     </Text>
                   </View>
+                  {(selectedJob.address?.trim()) ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Địa chỉ làm việc</Text>
+                      <Text style={styles.detailValue}>{selectedJob.address}</Text>
+                    </View>
+                  ) : null}
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Deadline auto done</Text>
                     <Text style={styles.detailValue}>
@@ -658,7 +841,7 @@ export default function BrowseJobsScreen() {
                           ? 'Hủy ứng tuyển'
                           : isApplied(selectedJob._id)
                             ? 'Đã được chọn'
-                          : 'Ứng tuyển'}
+                            : 'Ứng tuyển'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -740,6 +923,51 @@ const styles = StyleSheet.create({
   },
   filterBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   filterBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.primaryDark },
+  nearMeRow: { marginTop: 12, marginBottom: 4 },
+  nearMeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  nearMeChipActive: {
+    backgroundColor: COLORS.primary,
+  },
+  nearMeChipText: { fontSize: 14, fontWeight: '700', color: COLORS.primaryDark, marginLeft: 6 },
+  nearMeChipTextActive: { color: '#fff' },
+  getLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: COLORS.success,
+  },
+  getLocationBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.success, marginLeft: 8 },
+  recommendedSection: { marginBottom: 20, paddingHorizontal: 4 },
+  recommendedTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
+  recommendedSubtitle: { fontSize: 13, color: COLORS.textMuted, marginBottom: 12 },
+  recommendedScroll: { paddingRight: 16 },
+  recommendedCard: {
+    width: 180,
+    marginRight: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  recommendedCardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
+  recommendedCardPrice: { fontSize: 16, fontWeight: '800', color: COLORS.primary, marginBottom: 6 },
+  recommendedCardMeta: { flexDirection: 'row', alignItems: 'center' },
+  recommendedCardMetaText: { fontSize: 12, color: COLORS.textMuted, marginLeft: 4, flex: 1 },
   viewModeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   viewModeBtn: {
     flexDirection: 'row',
@@ -816,6 +1044,17 @@ const styles = StyleSheet.create({
   jobCardFooter: { flexDirection: 'column', marginBottom: 8, gap: 2 },
   jobPrice: { fontSize: 15, fontWeight: '800', color: COLORS.primary },
   jobMeta: { fontSize: 13, color: COLORS.textMuted },
+  jobAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  jobAddressText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginLeft: 6,
+    flex: 1,
+  },
   jobScheduleText: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 8 },
   applyBtn: {
     backgroundColor: COLORS.primary,

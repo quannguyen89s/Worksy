@@ -36,7 +36,7 @@ export const listJobsBrowseController = asyncHandler(async (req: Request, res: R
     radiusKm: Number.isFinite(radiusKm) ? radiusKm : 10,
     sort: validSort,
     page: Math.max(1, Math.floor(page)),
-    limit: Math.min(50, Math.max(1, Math.floor(limit))),
+    limit: Math.min(500, Math.max(1, Math.floor(limit))),
   };
   if (search) filters.search = search;
   if (status?.length) filters.status = status;
@@ -76,6 +76,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description,
     price,
     location,
+    address,
     scheduledAt,
     requiredWorkers,
     skillTags,
@@ -84,6 +85,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    address?: string;
     scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
@@ -93,6 +95,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     description: string;
     price: number;
     location: { lat: number; lng: number };
+    address?: string;
     scheduledAt: string | Date;
     requiredWorkers: number;
     skillTags?: string[];
@@ -104,6 +107,7 @@ export const createJobController = asyncHandler(async (req: Request, res: Respon
     scheduledAt,
     requiredWorkers,
   };
+  if (address !== undefined) payload.address = address;
   if (skillTags !== undefined) payload.skillTags = skillTags;
   const data = await jobService.createJob(customerId, payload);
   res.status(201).json({ success: true, data });
@@ -116,6 +120,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description,
     price,
     location,
+    address,
     scheduledAt,
     requiredWorkers,
     skillTags,
@@ -124,6 +129,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    address?: string;
     scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
@@ -133,6 +139,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
     description?: string;
     price?: number;
     location?: { lat: number; lng: number };
+    address?: string;
     scheduledAt?: string | Date;
     requiredWorkers?: number;
     skillTags?: string[];
@@ -141,6 +148,7 @@ export const updateJobController = asyncHandler(async (req: Request, res: Respon
   if (description !== undefined) payload.description = description;
   if (price !== undefined) payload.price = price;
   if (location !== undefined) payload.location = location;
+  if (address !== undefined) payload.address = address;
   if (scheduledAt !== undefined) payload.scheduledAt = scheduledAt;
   if (requiredWorkers !== undefined) payload.requiredWorkers = requiredWorkers;
   if (skillTags !== undefined) payload.skillTags = skillTags;
@@ -163,11 +171,13 @@ export const listRecommendedController = asyncHandler(
     const lat = req.query.lat != null ? Number(req.query.lat) : undefined;
     const lng = req.query.lng != null ? Number(req.query.lng) : undefined;
     const limit = req.query.limit != null ? Number(req.query.limit) : 20;
+    const radiusKm = req.query.radiusKm != null ? Number(req.query.radiusKm) : 20;
     const data = await jobService.listRecommendedJobs(
       req.user!.id,
       lat,
       lng,
       Number.isFinite(limit) ? limit : 20,
+      Number.isFinite(radiusKm) ? radiusKm : 20,
     );
     res.json({ success: true, data });
   },

@@ -8,6 +8,7 @@ export interface RegisterRequestBody {
     email: string
     password: string
     confirm_password: string
+    location?: { lat: number; lng: number }
 }
 
 export interface VerifyEmailRequestBody {

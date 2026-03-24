@@ -70,8 +70,8 @@ export const googleCallbackController = async (req: Request, res: Response) => {
 
 export const registerController = async (req: Request<ParamsDictionary, any, RegisterRequestBody>, res: Response) => {
     try {
-        const { name, email, password, confirm_password } = req.body;
-        const result = await registerService(name, email, password, confirm_password);
+        const { name, email, password, confirm_password, location } = req.body;
+        const result = await registerService(name, email, password, confirm_password, location);
         return res.status(HTTP_STATUS.CREATED).json(result);
     } catch (error) {
         return handleError(error, res);

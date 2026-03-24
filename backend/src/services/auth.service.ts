@@ -55,7 +55,13 @@ export const loginService = async (email: string, password: string) => {
     };
 }
 
-export const registerService = async (name: string, email: string, password: string, confirm_password: string) => {
+export const registerService = async (
+    name: string,
+    email: string,
+    password: string,
+    confirm_password: string,
+    location?: { lat: number; lng: number },
+) => {
     const existing = await userModel.findOne({ email });
     if (existing) {
         throw new AppError(USER_MESSAGE.USER_ALREADY_EXISTS, HTTP_STATUS.UNPROCESSABLE_ENTITY);
@@ -66,11 +72,14 @@ export const registerService = async (name: string, email: string, password: str
     const hashedPassword = await bcrypt.hash(password, 10);
     const user_id = new ObjectId();
 
-    // isVerified: true so user can login immediately without email verification
-    await userModel.create({ _id: user_id, name, email, password: hashedPassword, isVerified: true });
+    const createData: Record<string, unknown> = { _id: user_id, name, email, password: hashedPassword, isVerified: true };
+    if (location && typeof location.lat === "number" && typeof location.lng === "number") {
+        createData.location = { lat: location.lat, lng: location.lng };
+    }
+    await userModel.create(createData);
 
     return { message: USER_MESSAGE.REGISTER_SUCCESSFUL };
-}
+};
 
 export const verifyEmailService = async (emailVerifyToken: string) => {
     const decoded = jwt.verify(emailVerifyToken, process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN!) as { _id: string };

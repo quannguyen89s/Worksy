@@ -1,15 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { AddressSuggestion } from '@/services/geocodeService';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, StyleSheet, Modal, Pressable, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as jobApi from '@/api/jobApi';
+import { searchAddress } from '@/services/geocodeService';
 import { COLORS } from '@/theme/colors';
 import UserBottomBar from '@/components/navigation/UserBottomBar';
 import UserHeader from '@/components/navigation/UserHeader';
+import LocationMapPicker from '@/components/LocationMapPicker';
 import type { RootStackParamList } from '@/navigation/types';
 
 const { getErrorMessage } = jobApi;
@@ -38,6 +43,7 @@ function normalizeAssignedWorkers(job: jobApi.Job): { id: string; name: string }
 
 export default function MyJobsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [accessToken, setAccessToken] = useState('');
   const [myJobs, setMyJobs] = useState<jobApi.Job[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,11 +63,21 @@ export default function MyJobsScreen() {
     requiredWorkers: '1',
     workDate: '',
     workTime: '',
+    address: '',
     skillTags: '',
   });
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [pickerValue, setPickerValue] = useState(new Date());
+  const [formLocation, setFormLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [loadingAddressSuggestions, setLoadingAddressSuggestions] = useState(false);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const DEFAULT_LOCATION = { lat: 21.0285, lng: 105.8542 };
 
   const [feedbackJob, setFeedbackJob] = useState<jobApi.Job | null>(null);
   const [feedbackReviews, setFeedbackReviews] = useState<jobApi.JobReviewRow[]>([]);
@@ -69,6 +85,23 @@ export default function MyJobsScreen() {
   const [feedbackSaving, setFeedbackSaving] = useState<string | null>(null);
   const [draftRating, setDraftRating] = useState<Record<string, number>>({});
   const [draftComment, setDraftComment] = useState<Record<string, string>>({});
+
+  type StatusFilter = 'all' | 'pending' | 'open' | 'partial' | 'full' | 'done';
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
+    { value: 'all', label: 'Tất cả' },
+    { value: 'pending', label: 'Chờ duyệt' },
+    { value: 'open', label: 'Đang tuyển' },
+    { value: 'partial', label: 'Một phần' },
+    { value: 'full', label: 'Đã đủ' },
+    { value: 'done', label: 'Hoàn thành' },
+  ];
+
+  const filteredJobs = useMemo(() => {
+    if (statusFilter === 'all') return myJobs;
+    return myJobs.filter((j) => j.status === statusFilter);
+  }, [myJobs, statusFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -197,18 +230,28 @@ export default function MyJobsScreen() {
       Alert.alert('Lỗi', 'Vui lòng nhập đúng ngày và giờ làm (YYYY-MM-DD, HH:mm)');
       return;
     }
+    let jobLocation = formLocation ?? DEFAULT_LOCATION;
+    if (!formLocation && form.address.trim().length >= 2) {
+      const suggestions = await searchAddress(form.address.trim());
+      if (suggestions.length > 0) {
+        jobLocation = { lat: suggestions[0].lat, lng: suggestions[0].lng };
+      }
+    }
     setLoading(true);
     try {
       await jobApi.createJob(accessToken.trim(), {
         title: form.title.trim(),
         description: form.description.trim(),
         price,
-        location: { lat: 21.0285, lng: 105.8542 },
+        location: jobLocation,
         scheduledAt,
         requiredWorkers,
+        ...(form.address.trim() ? { address: form.address.trim() } : {}),
         skillTags: form.skillTags ? form.skillTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       });
-      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
+      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', address: '', skillTags: '' });
+      setFormLocation(null);
+      setAddressSuggestions([]);
       setCreateMode(false);
       setEditId(null);
       editIdRef.current = null;
@@ -238,19 +281,29 @@ export default function MyJobsScreen() {
       Alert.alert('Lỗi', 'Vui lòng nhập đúng ngày và giờ làm (YYYY-MM-DD, HH:mm)');
       return;
     }
+    let jobLocation = formLocation;
+    if (!formLocation && form.address.trim().length >= 2) {
+      const suggestions = await searchAddress(form.address.trim());
+      if (suggestions.length > 0) {
+        jobLocation = { lat: suggestions[0].lat, lng: suggestions[0].lng };
+      }
+    }
     setLoading(true);
     try {
       await jobApi.updateJob(accessToken.trim(), jobId, {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
         price,
+        ...(jobLocation ? { location: jobLocation } : {}),
         scheduledAt,
         requiredWorkers,
+        ...(form.address.trim() ? { address: form.address.trim() } : {}),
         skillTags: form.skillTags ? form.skillTags.split(',').map((s) => s.trim()).filter(Boolean) : [],
       });
       setEditId(null);
       editIdRef.current = null;
-      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
+      setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', address: '', skillTags: '' });
+      setFormLocation(null);
       fetchMyJobs();
       Alert.alert('Thành công', 'Đã cập nhật tin');
     } catch (err: unknown) {
@@ -295,15 +348,86 @@ export default function MyJobsScreen() {
       price: String(job.price),
       requiredWorkers: String(job.requiredWorkers),
       ...splitSchedule(job.scheduledAt),
+      address: job.address ?? '',
       skillTags: (job.skillTags ?? []).join(', '),
     });
+    setFormLocation(
+      job.location?.lat != null && job.location?.lng != null
+        ? { lat: job.location.lat, lng: job.location.lng }
+        : null,
+    );
   };
 
   const cancelEdit = () => {
     setEditId(null);
     setCreateMode(false);
     editIdRef.current = null;
-    setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' });
+    setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', address: '', skillTags: '' });
+    setFormLocation(null);
+    setAddressSuggestions([]);
+    setShowAddressSuggestions(false);
+  };
+
+  const fetchAddressSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setAddressSuggestions([]);
+      return;
+    }
+    setLoadingAddressSuggestions(true);
+    try {
+      const results = await searchAddress(query);
+      setAddressSuggestions(results);
+      setShowAddressSuggestions(results.length > 0);
+    } catch {
+      setAddressSuggestions([]);
+    } finally {
+      setLoadingAddressSuggestions(false);
+    }
+  }, []);
+
+  const handleAddressChange = useCallback((text: string) => {
+    setForm((f) => ({ ...f, address: text }));
+    setShowAddressSuggestions(false);
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    if (text.trim().length < 2) {
+      setAddressSuggestions([]);
+      return;
+    }
+    addressDebounceRef.current = setTimeout(() => {
+      addressDebounceRef.current = null;
+      fetchAddressSuggestions(text);
+    }, 400);
+  }, [fetchAddressSuggestions]);
+
+  const selectAddressSuggestion = useCallback((suggestion: AddressSuggestion) => {
+    setForm((f) => ({ ...f, address: suggestion.displayName }));
+    setFormLocation({ lat: suggestion.lat, lng: suggestion.lng });
+    setAddressSuggestions([]);
+    setShowAddressSuggestions(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    };
+  }, []);
+
+  const getCurrentLocation = async () => {
+    setLoadingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Cần quyền', 'Cho phép truy cập vị trí để đặt địa điểm công việc');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setFormLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      Alert.alert('Thành công', 'Đã lấy vị trí hiện tại');
+    } catch {
+      Alert.alert('Lỗi', 'Không thể lấy vị trí');
+    } finally {
+      setLoadingLocation(false);
+    }
   };
 
   const getStatusLabel = (status: string) => {
@@ -440,7 +564,7 @@ export default function MyJobsScreen() {
       [
         { text: 'Hủy', style: 'cancel' },
         {
-          text: 'Set done',
+          text: 'Hoàn thành',
           style: 'default',
           onPress: async () => {
             if (!accessToken.trim()) return;
@@ -548,31 +672,89 @@ export default function MyJobsScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 100 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
-          {loading && <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 12 }} />}
-          <View style={styles.btnRow}>
-            <TouchableOpacity
-              style={[styles.btn, styles.btnPrimary]}
-              activeOpacity={0.8}
-              onPress={() => { setCreateMode(true); setEditId(null); editIdRef.current = null; setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', skillTags: '' }); }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.btnPrimaryText}>+ Đăng tin mới</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnSecondary]} activeOpacity={0.8} onPress={fetchMyJobs} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.btnSecondaryText}>Tải lại</Text>
-            </TouchableOpacity>
+        {/* Action card với gradient */}
+        <View style={styles.actionCardWrap}>
+          <LinearGradient
+            colors={[COLORS.primaryLight, '#FFFBEB']}
+            style={styles.actionCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            {loading && <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 12 }} />}
+            <View style={styles.btnRow}>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnPrimary, styles.btnCreate]}
+                activeOpacity={0.85}
+                onPress={() => { setCreateMode(true); setEditId(null); editIdRef.current = null; setForm({ title: '', description: '', price: '', requiredWorkers: '1', workDate: '', workTime: '', address: '', skillTags: '' }); setFormLocation(null); }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <View style={styles.btnIconWrap}>
+                  <Ionicons name="add" size={22} color="#fff" />
+                </View>
+                <Text style={styles.btnPrimaryText}>Đăng tin mới</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btn, styles.btnSecondary, styles.btnRefresh]}
+                activeOpacity={0.85}
+                onPress={fetchMyJobs}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <View style={styles.btnIconWrapSecondary}>
+                  <Ionicons name="refresh" size={20} color={COLORS.primary} />
+                </View>
+                <Text style={styles.btnSecondaryText}>Tải lại</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* Filter theo trạng thái */}
+        <View style={styles.filterCard}>
+          <View style={styles.filterHeader}>
+            <Ionicons name="filter" size={18} color={COLORS.primary} />
+            <Text style={styles.filterLabel}>Lọc theo trạng thái</Text>
           </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {STATUS_FILTERS.map(({ value, label }) => {
+              const isActive = statusFilter === value;
+              return (
+                <TouchableOpacity
+                  key={value}
+                  style={[styles.filterChip, isActive && styles.filterChipActive]}
+                  onPress={() => setStatusFilter(value)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                    {label}
+                  </Text>
+                  {value !== 'all' && (
+                    <View style={[styles.filterChipBadge, isActive && styles.filterChipBadgeActive]}>
+                      <Text style={[styles.filterChipBadgeText, isActive && styles.filterChipBadgeTextActive]}>
+                        {myJobs.filter((j) => j.status === value).length}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* Form */}
         {(createMode || editId) && (
-          <View style={styles.card}>
-            <Text style={styles.formTitle}>{editId ? 'Cập nhật tin' : 'Tạo tin mới'}</Text>
+          <View style={[styles.card, styles.formCard]}>
+            <View style={styles.formTitleRow}>
+              <Ionicons name={editId ? 'pencil' : 'add-circle'} size={22} color={COLORS.primary} style={{ marginRight: 10 }} />
+              <Text style={styles.formTitle}>{editId ? 'Cập nhật tin' : 'Tạo tin mới'}</Text>
+            </View>
             <TextInput
               placeholder="Tiêu đề *"
               value={form.title}
@@ -627,6 +809,68 @@ export default function MyJobsScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <View style={styles.addressInputWrap}>
+              <TextInput
+                placeholder="Nhập địa chỉ làm việc (gợi ý khi nhập 2+ ký tự)"
+                value={form.address}
+                onChangeText={handleAddressChange}
+                onFocus={() => addressSuggestions.length > 0 && setShowAddressSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 200)}
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+              />
+              {loadingAddressSuggestions && (
+                <View style={styles.addressSuggestLoading}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                </View>
+              )}
+              {showAddressSuggestions && addressSuggestions.length > 0 && (
+                <View style={styles.addressSuggestList}>
+                  {addressSuggestions.map((s) => (
+                    <TouchableOpacity
+                      key={s.placeId}
+                      style={styles.addressSuggestItem}
+                      onPress={() => selectAddressSuggestion(s)}
+                    >
+                      <Ionicons name="location-outline" size={16} color={COLORS.primary} />
+                      <Text style={styles.addressSuggestText} numberOfLines={2}>{s.displayName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+            <View style={styles.locationRow}>
+              <Text style={styles.locationLabel}>Vị trí (tọa độ)</Text>
+              <View style={styles.locationBtnRow}>
+                <TouchableOpacity
+                  style={[styles.locationBtn, formLocation && styles.locationBtnActive]}
+                  onPress={getCurrentLocation}
+                  disabled={loadingLocation}
+                >
+                  <Ionicons name="location" size={18} color={formLocation ? COLORS.success : COLORS.textMuted} />
+                  <Text style={[styles.locationBtnText, formLocation && styles.locationBtnTextActive]} numberOfLines={1}>
+                    {loadingLocation ? 'Đang lấy...' : formLocation ? `${formLocation.lat.toFixed(4)}, ${formLocation.lng.toFixed(4)}` : 'Vị trí hiện tại'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.locationBtn, formLocation && styles.locationBtnActive]}
+                  onPress={() => setShowMapPicker(true)}
+                >
+                  <Ionicons name="map" size={18} color={formLocation ? COLORS.success : COLORS.textMuted} />
+                  <Text style={[styles.locationBtnText, formLocation && styles.locationBtnTextActive]}>Chọn trên bản đồ</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <LocationMapPicker
+              visible={showMapPicker}
+              onClose={() => setShowMapPicker(false)}
+              initialLocation={formLocation}
+              onConfirm={(r) => {
+                setFormLocation({ lat: r.lat, lng: r.lng });
+                setForm((f) => ({ ...f, address: r.address }));
+                setShowMapPicker(false);
+              }}
+            />
             <TextInput
               placeholder="Kỹ năng (cách nhau bằng dấu phẩy)"
               value={form.skillTags}
@@ -655,15 +899,38 @@ export default function MyJobsScreen() {
 
         {/* Job list */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Danh sách tin ({myJobs.length})</Text>
+          <View style={styles.cardTitleRow}>
+            <View style={styles.cardTitleLeft}>
+              <View style={styles.cardTitleIconWrap}>
+                <Ionicons name="list" size={20} color={COLORS.primary} />
+              </View>
+              <Text style={styles.cardTitle}>Danh sách tin</Text>
+            </View>
+            <View style={styles.cardTitleBadge}>
+              <Text style={styles.cardTitleBadgeText}>
+                {filteredJobs.length}{statusFilter !== 'all' ? ` / ${myJobs.length}` : ''}
+              </Text>
+            </View>
+          </View>
           {myJobs.length === 0 ? (
             <View style={styles.emptyState}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="briefcase-outline" size={44} color={COLORS.primary} />
+              </View>
               <Text style={styles.emptyText}>Chưa có tin nào</Text>
               <Text style={styles.emptyHint}>Bấm Đăng tin mới để tạo tin tuyển dụng</Text>
             </View>
+          ) : filteredJobs.length === 0 ? (
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyIconWrap, styles.emptyIconWrapMuted]}>
+                <Ionicons name="filter-outline" size={40} color={COLORS.textMuted} />
+              </View>
+              <Text style={styles.emptyText}>Không có tin với trạng thái này</Text>
+              <Text style={styles.emptyHint}>Thử chọn bộ lọc khác</Text>
+            </View>
           ) : (
-            myJobs.map((job) => (
-              <View key={job._id} style={styles.jobCard}>
+            filteredJobs.map((job) => (
+              <View key={job._id} style={[styles.jobCard, { borderLeftColor: getStatusColor(job.status) }]}>
                 <TouchableOpacity activeOpacity={0.7} onPress={() => setSelectedJob(job)} style={{ flex: 1 }}>
                   <View style={styles.jobCardHeader}>
                     <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
@@ -675,10 +942,16 @@ export default function MyJobsScreen() {
                   </View>
                   <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
                   <View style={styles.jobCardFooter}>
-                    <Text style={styles.jobPrice}>{job.price.toLocaleString('vi-VN')} VNĐ</Text>
-                    <Text style={styles.jobMetaText}>
-                      {job.assignedWorkers}/{job.requiredWorkers} người
-                    </Text>
+                    <View style={styles.jobMetaItem}>
+                      <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
+                      <Text style={styles.jobPrice}>{job.price.toLocaleString('vi-VN')} VNĐ</Text>
+                    </View>
+                    <View style={styles.jobMetaItem}>
+                      <Ionicons name="people-outline" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.jobMetaText}>
+                        {job.assignedWorkers}/{job.requiredWorkers} người
+                      </Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
                 <View style={styles.jobActions}>
@@ -695,6 +968,7 @@ export default function MyJobsScreen() {
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
                   >
+                    <Ionicons name="people" size={14} color={canReviewApplicants(job) ? COLORS.primary : '#9CA3AF'} style={{ marginRight: 4 }} />
                     <Text style={[styles.jobBtnActionText, !canReviewApplicants(job) && { color: '#9CA3AF' }]}>
                       Ứng viên
                     </Text>
@@ -714,8 +988,9 @@ export default function MyJobsScreen() {
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
                   >
+                    <Ionicons name="checkmark-done" size={14} color={canComplete(job) ? COLORS.success : '#9CA3AF'} style={{ marginRight: 4 }} />
                     <Text style={[styles.jobBtnActionText, !canComplete(job) && { color: '#9CA3AF' }]}>
-                      Set done
+                      Hoàn thành
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -724,6 +999,7 @@ export default function MyJobsScreen() {
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     activeOpacity={0.7}
                   >
+                    <Ionicons name="pencil" size={14} color={canEditDelete(job.status) ? COLORS.text : '#9CA3AF'} style={{ marginRight: 4 }} />
                     <Text style={[styles.jobBtnActionText, !canEditDelete(job.status) && { color: '#9CA3AF' }]}>Sửa</Text>
                   </TouchableOpacity>
                 </View>
@@ -886,9 +1162,9 @@ export default function MyJobsScreen() {
                     </View>
                   )}
                   <View style={styles.detailSection}>
-                    <Text style={styles.detailLabel}>Vị trí</Text>
+                    <Text style={styles.detailLabel}>Địa chỉ làm việc</Text>
                     <Text style={styles.detailValue}>
-                      {selectedJob.location?.lat?.toFixed(4)}, {selectedJob.location?.lng?.toFixed(4)}
+                      {selectedJob.address?.trim() || `Tọa độ: ${selectedJob.location?.lat?.toFixed(4)}, ${selectedJob.location?.lng?.toFixed(4)}`}
                     </Text>
                   </View>
                   <View style={styles.detailSection}>
@@ -1183,7 +1459,35 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: COLORS.text },
   headerSubtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
   scroll: { flex: 1 },
-  scrollContent: { padding: 20, paddingBottom: 150 },
+  scrollContent: { padding: 20 },
+  actionCardWrap: { marginBottom: 18 },
+  actionCard: {
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.15)',
+    overflow: 'hidden',
+  },
+  btnIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  btnIconWrapSecondary: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  btnCreate: { flex: 1 },
+  btnRefresh: { flex: 0.4, minWidth: 120 },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 20,
@@ -1197,12 +1501,83 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  filterCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  filterHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  filterLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterScroll: { paddingRight: 8 },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderRadius: 28,
+    backgroundColor: '#FAFAF9',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    marginRight: 10,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  filterChipText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
+  filterChipTextActive: { color: COLORS.primaryDark },
+  filterChipBadge: {
+    marginLeft: 6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  filterChipBadgeActive: { backgroundColor: COLORS.primary },
+  filterChipBadgeText: { fontSize: 11, fontWeight: '700', color: COLORS.textMuted },
+  filterChipBadgeTextActive: { color: '#fff' },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  cardTitleLeft: { flexDirection: 'row', alignItems: 'center' },
+  cardTitleIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  cardTitleBadge: {
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(180, 83, 9, 0.2)',
+  },
+  cardTitleBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.primaryDark },
   cardHint: { fontSize: 13, color: COLORS.textMuted, marginBottom: 14 },
   input: {
     backgroundColor: '#FAFAF9',
-    borderRadius: 14,
-    paddingHorizontal: 18,
+    borderRadius: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     fontSize: 16,
     color: COLORS.text,
@@ -1214,6 +1589,50 @@ const styles = StyleSheet.create({
   pickerInput: { justifyContent: 'center' },
   pickerValue: { color: COLORS.text, fontSize: 16 },
   pickerPlaceholder: { color: COLORS.textMuted, fontSize: 16 },
+  addressInputWrap: { position: 'relative', marginBottom: 14 },
+  addressSuggestLoading: { position: 'absolute', right: 16, top: 18 },
+  addressSuggestList: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '100%',
+    marginTop: 4,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    maxHeight: 200,
+    zIndex: 10,
+  },
+  addressSuggestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  addressSuggestText: { flex: 1, fontSize: 14, color: COLORS.text, marginLeft: 10 },
+  locationRow: { marginBottom: 14 },
+  locationLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginBottom: 8, textTransform: 'uppercase' },
+  locationBtnRow: { flexDirection: 'row', gap: 10 },
+  locationBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: '#FAFAF9',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  locationBtnActive: {
+    backgroundColor: COLORS.successLight,
+    borderColor: COLORS.success,
+  },
+  locationBtnText: { fontSize: 15, color: COLORS.textMuted, marginLeft: 10 },
+  locationBtnTextActive: { color: COLORS.success, fontWeight: '600' },
   pickerModalContent: {
     backgroundColor: COLORS.card,
     borderRadius: 18,
@@ -1225,7 +1644,7 @@ const styles = StyleSheet.create({
   pickerModalFooter: { flexDirection: 'row', gap: 10, marginTop: 8 },
   row: { flexDirection: 'row' },
   btnRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginTop: 4 },
-  btn: { paddingVertical: 16, paddingHorizontal: 22, borderRadius: 14, alignItems: 'center' },
+  btn: { flexDirection: 'row', paddingVertical: 16, paddingHorizontal: 22, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   btnPrimary: {
     backgroundColor: COLORS.primary,
     shadowColor: COLORS.primary,
@@ -1239,39 +1658,56 @@ const styles = StyleSheet.create({
   btnSecondaryText: { color: COLORS.text, fontWeight: '600', fontSize: 15 },
   btnOutline: { borderWidth: 2, borderColor: COLORS.border },
   btnOutlineText: { color: COLORS.textMuted, fontWeight: '600', fontSize: 15 },
-  formTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 18 },
-  emptyState: { paddingVertical: 48, alignItems: 'center' },
+  formCard: { borderLeftWidth: 4, borderLeftColor: COLORS.primary },
+  formTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  formTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  emptyState: { paddingVertical: 48, paddingHorizontal: 24, alignItems: 'center', marginTop: 8 },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyIconWrapMuted: { backgroundColor: COLORS.borderLight },
   emptyText: { fontSize: 17, color: COLORS.textMuted, marginBottom: 6, fontWeight: '500' },
   emptyHint: { fontSize: 14, color: COLORS.textMuted, opacity: 0.85 },
   jobCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 20,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
+    borderLeftWidth: 5,
+    borderLeftColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowRadius: 14,
+    elevation: 4,
+    overflow: 'hidden',
   },
   jobCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
   jobTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, flex: 1, marginRight: 12 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 22 },
   statusBadgeText: { fontSize: 12, fontWeight: '600' },
   statusBadgeLarge: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 14 },
   jobDesc: { fontSize: 14, color: COLORS.textSecondary, marginBottom: 14, lineHeight: 22 },
   jobCardFooter: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  jobPrice: { fontSize: 17, fontWeight: '800', color: COLORS.primary, marginRight: 18 },
-  jobMetaText: { fontSize: 13, color: COLORS.textMuted },
+  jobMetaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
+  jobPrice: { fontSize: 16, fontWeight: '800', color: COLORS.primary, marginLeft: 6 },
+  jobMetaText: { fontSize: 13, color: COLORS.textMuted, marginLeft: 6 },
   jobActions: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   jobBtnAction: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: '#F3F4F6',
-    paddingVertical: 9,
-    borderRadius: 10,
-    minHeight: 36,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minHeight: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1320,16 +1756,21 @@ const styles = StyleSheet.create({
   jobBtnDeleteText: { color: COLORS.error, fontWeight: '700', fontSize: 14 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
     padding: 0,
   },
   modalContent: {
     backgroundColor: COLORS.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '85%',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '88%',
     paddingBottom: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 24,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1350,7 +1791,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  modalBody: { maxHeight: 400, padding: 20 },
+  modalBody: { maxHeight: 480, padding: 20 },
   modalFooter: {
     flexDirection: 'row',
     flexWrap: 'wrap',

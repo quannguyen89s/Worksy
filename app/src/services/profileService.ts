@@ -6,7 +6,7 @@ export const profileService = {
     return response.data;
   },
 
-  updateProfile: async (data: { name?: string; avatar?: string }) => {
+  updateProfile: async (data: { name?: string; avatar?: string; location?: { lat: number; lng: number } }) => {
     const response = await apiClient.patch('/profile', data);
     return response.data;
   },

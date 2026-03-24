@@ -21,6 +21,7 @@ export type JobCreateBody = {
   description: string;
   price: number;
   location: { lat: number; lng: number };
+  address?: string;
   scheduledAt: string;
   requiredWorkers: number;
   skillTags?: string[];
@@ -31,6 +32,7 @@ export type JobUpdateBody = {
   description?: string;
   price?: number;
   location?: { lat: number; lng: number };
+  address?: string;
   scheduledAt?: string;
   requiredWorkers?: number;
   skillTags?: string[];
@@ -48,6 +50,7 @@ export type Job = {
   description: string;
   price: number;
   location: { lat: number; lng: number };
+  address?: string;
   scheduledAt?: string;
   requiredWorkers: number;
   assignedWorkers: number;
@@ -139,6 +142,24 @@ function parseScore(raw: unknown): number {
     if (o.value != null) return parseScore(o.value);
   }
   return 0;
+}
+
+export async function listRecommendedJobs(
+  accessToken: string,
+  params?: { lat?: number; lng?: number; limit?: number; radiusKm?: number },
+): Promise<Job[]> {
+  const q = new URLSearchParams();
+  if (params?.lat != null) q.set('lat', String(params.lat));
+  if (params?.lng != null) q.set('lng', String(params.lng));
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.radiusKm != null) q.set('radiusKm', String(params.radiusKm));
+  const query = q.toString();
+  const url = `${API_BASE}/jobs/recommended${query ? `?${query}` : ''}`;
+  const { data } = await axios.get(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return Array.isArray(data.data) ? data.data : [];
 }
 
 export async function browseJobs(

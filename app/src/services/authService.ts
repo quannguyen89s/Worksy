@@ -57,8 +57,16 @@ export const authService = {
     return data;
   },
 
-  register: async (name: string, email: string, password: string, confirm_password: string) => {
-    const response = await apiClient.post('/auth/register', { name, email, password, confirm_password });
+  register: async (
+    name: string,
+    email: string,
+    password: string,
+    confirm_password: string,
+    location?: { lat: number; lng: number },
+  ) => {
+    const body: Record<string, unknown> = { name, email, password, confirm_password };
+    if (location?.lat != null && location?.lng != null) body.location = location;
+    const response = await apiClient.post('/auth/register', body);
     return response.data;
   },
 

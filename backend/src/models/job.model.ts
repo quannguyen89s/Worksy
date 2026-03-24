@@ -20,6 +20,11 @@ const jobSchema = new mongoose.Schema(
       lat: { type: Number, required: true },
       lng: { type: Number, required: true },
     },
+    address: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     scheduledAt: {
       type: Date,
       default: null,

@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { Toast } from '@/components/ToastProvider';
 import profileService from '@/services/profileService';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +25,8 @@ export default function EditProfileScreen({ navigation }: any) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +36,9 @@ export default function EditProfileScreen({ navigation }: any) {
         setName(p.name || '');
         setAvatarUri(p.avatar ? (p.avatar.startsWith('http') ? p.avatar : `${API_BASE_URL}${p.avatar}`) : '');
         setEmail(p.email || '');
+        if (p.location?.lat != null && p.location?.lng != null) {
+          setUserLocation({ lat: p.location.lat, lng: p.location.lng });
+        }
         setRole(p.role || '');
         setCreatedAt(p.createdAt || '');
         setIsVerified(p.isVerified || false);
@@ -91,7 +97,10 @@ export default function EditProfileScreen({ navigation }: any) {
     }
     setSaving(true);
     try {
-      await profileService.updateProfile({ name: name.trim() });
+      await profileService.updateProfile({
+        name: name.trim(),
+        ...(userLocation ? { location: userLocation } : {}),
+      });
       Toast.show({ type: 'success', title: 'Success', message: 'Profile updated successfully' });
       navigation.goBack();
     } catch (error: any) {
@@ -205,6 +214,40 @@ export default function EditProfileScreen({ navigation }: any) {
 
             {/* Created At (read-only) */}
             <ReadOnlyField icon="calendar-outline" label="Joined Date" value={formatDate(createdAt)} />
+
+            {/* Vị trí (editable) - for worker tìm việc gần */}
+            <View className="mb-6">
+              <Text className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Vị trí làm việc</Text>
+              <TouchableOpacity
+                onPress={async () => {
+                  setLoadingLocation(true);
+                  try {
+                    const { status } = await Location.requestForegroundPermissionsAsync();
+                    if (status !== 'granted') {
+                      Toast.show({ type: 'error', title: 'Lỗi', message: 'Cần quyền truy cập vị trí' });
+                      return;
+                    }
+                    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    Toast.show({ type: 'success', title: 'Thành công', message: 'Đã cập nhật vị trí' });
+                  } catch (e) {
+                    Toast.show({ type: 'error', title: 'Lỗi', message: 'Không thể lấy vị trí' });
+                  } finally {
+                    setLoadingLocation(false);
+                  }
+                }}
+                disabled={loadingLocation}
+                className="flex-row items-center gap-3 pb-2 border-b border-gray-50"
+              >
+                <Ionicons name="location" size={18} color={userLocation ? ACCENT : '#B0B0B0'} />
+                <Text className="flex-1 text-base" style={{ color: userLocation ? '#111827' : '#9CA3AF' }}>
+                  {userLocation
+                    ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`
+                    : 'Bấm để lấy vị trí hiện tại'}
+                </Text>
+                {loadingLocation ? <ActivityIndicator size="small" color={ACCENT} /> : null}
+              </TouchableOpacity>
+            </View>
 
             {/* Verified (read-only) */}
             <View className="mb-2">
