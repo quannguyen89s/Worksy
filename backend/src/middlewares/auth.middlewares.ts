@@ -248,3 +248,14 @@ export const resetPasswordValidator = validate(checkSchema({
         },
     },
 }, ["body"]));
+
+export const googleIdTokenValidator = validate(checkSchema({
+    idToken: {
+        notEmpty: {
+            errorMessage: "idToken là bắt buộc",
+        },
+        isString: {
+            errorMessage: "idToken phải là chuỗi",
+        },
+    },
+}, ["body"]));

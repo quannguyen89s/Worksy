@@ -1,12 +1,12 @@
 import '@/bootstrapNative';
 import 'react-native-gesture-handler';
 import './global.css';
+import * as WebBrowser from 'expo-web-browser';
 import { NavigationContainer } from '@react-navigation/native';
 import { CardStyleInterpolators, createStackNavigator } from '@react-navigation/stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import AppNavigator from './src/navigation/AppNavigator';
 import HomeScreen from '@/screens/HomeScreen';
 import ToastProvider from '@/components/ToastProvider';
 import LoginScreen from '@/components/authScreens/LoginScreen';
@@ -28,6 +28,8 @@ import AdminUsersScreen from '@/screens/admin/AdminUsersScreen';
 import AdminJobsScreen from '@/screens/admin/AdminJobsScreen';
 import AdminSettingsScreen from '@/screens/admin/AdminSettingsScreen';
 import AdminAlertsScreen from './src/screens/admin/AdminAlertsScreen';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const Stack = createStackNavigator<RootStackParamList>();
 

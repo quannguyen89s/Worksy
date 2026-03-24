@@ -7,6 +7,8 @@ export const COLORS = {
 
   // Background
   bg: '#FFFBEB',
+  /** Nền feed (thợ): hơi xám để thẻ trắng nổi, vẫn ấm */
+  listScreen: '#F2F0EB',
   bgWarm: '#FFF8E7',
   background: '#FFFBEB',
   card: '#FFFFFF',
