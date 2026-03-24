@@ -147,6 +147,20 @@ export default function NotificationsScreen() {
       } finally {
         setNavigating(null);
       }
+      return;
+    }
+
+    if (
+      item.type === 'job_application' ||
+      item.type === 'application_accepted' ||
+      item.type === 'application_rejected'
+    ) {
+      // Worker-facing "Đã gửi ứng tuyển" notification carries customerId in payload.
+      if (item.type === 'job_application' && item.data?.['customerId']) {
+        navigation.navigate('WorkerApplies');
+        return;
+      }
+      navigation.navigate('MyJobs');
     }
   };
 
@@ -159,7 +173,11 @@ export default function NotificationsScreen() {
       color: '#9CA3AF',
     };
     const isNavigatingThis = navigating === item._id;
-    const isClickable = item.type === 'new_message';
+    const isClickable =
+      item.type === 'new_message' ||
+      item.type === 'job_application' ||
+      item.type === 'application_accepted' ||
+      item.type === 'application_rejected';
 
     return (
       <TouchableOpacity
