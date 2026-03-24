@@ -76,12 +76,16 @@ export const authService = {
   },
 
   /**
-   * Backend hiện dùng OAuth redirect (GET `/auth/google`), không có POST `/auth/google-login`.
-   * Đăng nhập Google trên app: dùng WebBrowser trong `LoginScreen`.
+   * Đăng nhập Google trên Expo: `expo-auth-session` lấy id_token → backend `verifyIdToken`.
    */
-  googleLogin: async (idToken: string) => {
-    const response = await apiClient.post('/auth/google-login', { idToken });
-    return response.data;
+  signInWithGoogleIdToken: async (idToken: string) => {
+    const response = await apiClient.post('/auth/google-token', { idToken });
+    return response.data as {
+      message?: string;
+      accessToken: string;
+      refreshToken: string;
+      user?: unknown;
+    };
   },
 
   forgotPassword: async (email: string) => {

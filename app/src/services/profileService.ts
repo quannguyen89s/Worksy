@@ -22,14 +22,24 @@ export const profileService = {
 
   uploadAvatar: async (uri: string) => {
     const formData = new FormData();
-    const filename = uri.split('/').pop() || 'avatar.jpg';
+    const filename = uri.split('/').pop()?.split('?')[0] || 'avatar.jpg';
     const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    const ext = (match?.[1] || 'jpg').toLowerCase();
+    const mime =
+      ext === 'jpg' || ext === 'jpeg'
+        ? 'image/jpeg'
+        : ext === 'png'
+          ? 'image/png'
+          : ext === 'webp'
+            ? 'image/webp'
+            : ext === 'heic'
+              ? 'image/heic'
+              : 'image/jpeg';
 
     formData.append('avatar', {
       uri,
-      name: filename,
-      type,
+      name: filename.includes('.') ? filename : `${filename}.jpg`,
+      type: mime,
     } as any);
 
     const response = await apiClient.post('/profile/upload-avatar', formData, {

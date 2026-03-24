@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { loginService, registerService, verifyEmailService, resendVerifyEmailService, forgotPasswordService, verifyForgotPasswordOTPService, resetPasswordService, logoutService, refreshTokenService } from "../services/auth.service";
-import { getGoogleAuthURL, googleCallbackService } from "../services/google.service";
+import { getGoogleAuthURL, googleCallbackService, loginWithGoogleIdToken } from "../services/google.service";
 import { LoginRequestBody, RegisterRequestBody, VerifyEmailRequestBody, ForgotPasswordRequestBody, VerifyForgotPasswordOTPRequestBody, ResetPasswordRequestBody } from "../models/request/user.request";
 import { ParamsDictionary } from "express-serve-static-core";
 import HTTP_STATUS from "../constants/httpStatus";
@@ -33,6 +33,17 @@ export const logoutController = async (req: Request, res: Response) => {
         return handleError(error, res);
     }
 }
+
+/** Expo / React Native: nhận id_token từ expo-auth-session, không redirect qua localhost. */
+export const googleTokenController = async (req: Request, res: Response) => {
+    try {
+        const { idToken } = req.body as { idToken?: string };
+        const result = await loginWithGoogleIdToken(idToken!);
+        return res.status(HTTP_STATUS.OK).json(result);
+    } catch (error) {
+        return handleError(error, res);
+    }
+};
 
 export const googleAuthController = async (req: Request, res: Response) => {
     try {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -20,9 +20,7 @@ import { COLORS } from '@/theme/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authService from '@/services/authService';
 import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { API_BASE_URL } from '@/config/api';
+import * as Google from 'expo-auth-session/providers/google';
 import { syncAdminApiTokenFromAccessToken } from '@/api/adminApi';
 
 const ACCENT = '#92400E';
@@ -79,34 +77,113 @@ export default function LoginScreen({ navigation }: any) {
     } catch { }
   };
 
+  const webClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest(
+    {
+      webClientId,
+      iosClientId: iosClientId || webClientId,
+      androidClientId: androidClientId || webClientId,
+      selectAccount: true,
+    },
+    { path: 'auth' },
+  );
+
+  const finishGoogleSignIn = useCallback(
+    async (idToken: string) => {
+      const data = await authService.signInWithGoogleIdToken(idToken);
+      const accessToken = data.accessToken;
+      const refreshToken = data.refreshToken;
+      if (!accessToken || !refreshToken) {
+        Toast.show({
+          type: 'error',
+          title: 'Lỗi',
+          message: 'Server không trả token sau Google. Kiểm tra /auth/google-token.',
+        });
+        return;
+      }
+      await SecureStore.setItemAsync('accessToken', accessToken);
+      await SecureStore.setItemAsync('refreshToken', refreshToken);
+      const role = await syncAdminApiTokenFromAccessToken(accessToken);
+      Toast.show({ type: 'success', title: 'Success', message: 'Google login successful!' });
+      navigation.reset({
+        index: 0,
+        routes: [{ name: role === 'admin' ? 'AdminDashboard' : 'Home' }],
+      });
+    },
+    [navigation],
+  );
+
+  const googleHandledIdTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const r = googleResponse;
+    if (!r) return;
+
+    if (r.type === 'cancel' || r.type === 'dismiss') {
+      setGoogleLoading(false);
+      return;
+    }
+    if (r.type === 'error') {
+      setGoogleLoading(false);
+      Toast.show({
+        type: 'error',
+        title: 'Google',
+        message: r.error?.message ?? 'Đăng nhập Google thất bại.',
+      });
+      return;
+    }
+    if (r.type !== 'success') return;
+
+    const idToken = r.authentication?.idToken ?? r.params?.id_token;
+    if (!idToken) {
+      // Code exchange (PKCE) đang chạy trong expo-auth-session — chờ response cập nhật thêm.
+      return;
+    }
+    if (googleHandledIdTokenRef.current === idToken) return;
+    googleHandledIdTokenRef.current = idToken;
+
+    void (async () => {
+      try {
+        await finishGoogleSignIn(idToken);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string };
+        const msg =
+          err?.response?.data?.message ??
+          err?.message ??
+          'Đăng nhập Google thất bại. Kiểm tra backend và GOOGLE_*_CLIENT_ID.';
+        Toast.show({ type: 'error', title: 'Google', message: String(msg) });
+        googleHandledIdTokenRef.current = null;
+      } finally {
+        setGoogleLoading(false);
+      }
+    })();
+  }, [googleResponse, finishGoogleSignIn]);
+
   const handleGoogleLogin = async () => {
+    if (!webClientId) {
+      Toast.show({
+        type: 'error',
+        title: 'Cấu hình',
+        message:
+          'Thiếu EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (hoặc EXPO_PUBLIC_GOOGLE_CLIENT_ID) trong app/.env',
+      });
+      return;
+    }
+    if (!googleRequest) {
+      Toast.show({ type: 'error', title: 'Google', message: 'Đang tải cấu hình đăng nhập, thử lại sau.' });
+      return;
+    }
     setGoogleLoading(true);
     try {
-      const returnUrl = Linking.createURL('auth');
-      const result = await WebBrowser.openAuthSessionAsync(
-        `${API_BASE_URL}/auth/google?returnUrl=${encodeURIComponent(returnUrl)}`,
-        returnUrl
-      );
-      if (result.type === 'success' && result.url) {
-        const parsed = Linking.parse(result.url);
-        const accessToken = parsed.queryParams?.accessToken as string;
-        const refreshToken = parsed.queryParams?.refreshToken as string;
-        if (accessToken && refreshToken) {
-          await SecureStore.setItemAsync('accessToken', accessToken);
-          await SecureStore.setItemAsync('refreshToken', refreshToken);
-          const role = await syncAdminApiTokenFromAccessToken(accessToken);
-          Toast.show({ type: 'success', title: 'Success', message: 'Google login successful!' });
-          navigation.reset({
-            index: 0,
-            routes: [{ name: role === 'admin' ? 'AdminDashboard' : 'Home' }],
-          });
-        } else {
-          Toast.show({ type: 'error', title: 'Error', message: 'Google login failed.' });
-        }
-      }
+      await googlePromptAsync();
     } catch {
-      Toast.show({ type: 'error', title: 'Error', message: 'Google login failed.' });
-    } finally { setGoogleLoading(false); }
+      setGoogleLoading(false);
+      Toast.show({ type: 'error', title: 'Google', message: 'Không mở được trình duyệt đăng nhập.' });
+    }
   };
 
   const handleLogin = async () => {
