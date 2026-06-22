@@ -2,9 +2,12 @@ import type { RootStackParamList } from '@/navigation/types';
 import { adminTheme } from '@/constants/adminTheme';
 import { Ionicons } from '@expo/vector-icons';
 import type { NavigationProp } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { ComponentProps } from 'react';
+import { useCallback, useState } from 'react';
+import { fetchOverview } from '@/api/adminApi';
 
 type AdminRoute = keyof Pick<
   RootStackParamList,
@@ -30,8 +33,26 @@ export default function AdminBottomBar({
   active: AdminRoute;
 }) {
   const insets = useSafeAreaInsets();
+  const [pendingJobsCount, setPendingJobsCount] = useState(0);
   const bottomPad = Math.max(insets.bottom, 10);
   const height = TAB_H + bottomPad;
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      void fetchOverview()
+        .then((data) => {
+          if (!mounted) return;
+          setPendingJobsCount(data.jobsOpen ?? 0);
+        })
+        .catch(() => {
+          // keep previous value on transient API errors
+        });
+      return () => {
+        mounted = false;
+      };
+    }, []),
+  );
 
   return (
     <View
@@ -101,6 +122,13 @@ export default function AdminBottomBar({
             size={22}
             color={active === 'AdminAlerts' ? adminTheme.brown : adminTheme.brownMuted}
           />
+          {pendingJobsCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {pendingJobsCount > 9 ? '9+' : String(pendingJobsCount)}
+              </Text>
+            </View>
+          )}
         </View>
         <Text style={[styles.tabLabel, active === 'AdminAlerts' && styles.tabLabelActive]}>
           ALERTS
@@ -135,8 +163,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 14,
+    position: 'relative',
   },
   tabIconBoxActive: { backgroundColor: adminTheme.gold },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: adminTheme.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   tabLabel: { fontSize: 9, fontWeight: '800', color: adminTheme.brownMuted, letterSpacing: 0.3 },
   tabLabelActive: { color: adminTheme.brown },
 });

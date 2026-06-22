@@ -1,60 +1,77 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, type ComponentProps } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView, ActivityIndicator, Image,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Toast } from '@/components/ToastProvider';
 import profileService from '@/services/profileService';
 import * as ImagePicker from 'expo-image-picker';
-import { API_BASE_URL } from '@/config/api';
+import { ProfileUserAvatar, PROFILE_AVATAR_ACCENT } from '@/components/ProfileScreens/ProfileUserAvatar';
+import { ProfilePrimaryButton } from '@/components/ProfileScreens/ProfilePrimaryButton';
 
-const ACCENT = '#92400E';
+const ACCENT = PROFILE_AVATAR_ACCENT;
+const SCREEN_BG = '#FFF8E7';
 
 export default function EditProfileScreen({ navigation }: any) {
   const [name, setName] = useState('');
-  const [avatarUri, setAvatarUri] = useState('');
+  const [avatarRaw, setAvatarRaw] = useState<string | null>(null);
+  const [avatarCacheBust, setAvatarCacheBust] = useState(0);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [createdAt, setCreatedAt] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const result = await profileService.getProfile();
-        const p = result.result;
-        setName(p.name || '');
-        setAvatarUri(p.avatar ? (p.avatar.startsWith('http') ? p.avatar : `${API_BASE_URL}${p.avatar}`) : '');
-        setEmail(p.email || '');
-        setRole(p.role || '');
-        setCreatedAt(p.createdAt || '');
-        setIsVerified(p.isVerified || false);
-      } catch {
-        Toast.show({ type: 'error', title: 'Error', message: 'Failed to load profile' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const loadProfile = useCallback(async () => {
+    try {
+      const result = await profileService.getProfile();
+      const p = result.result;
+      setName(p.name || '');
+      setAvatarRaw(p.avatar ?? null);
+      setEmail(p.email || '');
+      setRole(p.role || '');
+      setCreatedAt(p.createdAt || '');
+      setIsVerified(Boolean(p.isVerified));
+    } catch {
+      Toast.show({ type: 'error', title: 'Lỗi', message: 'Không tải được hồ sơ' });
+    } finally {
+      setBootstrapped(true);
+    }
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [loadProfile]),
+  );
+
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return '--';
+    if (!dateStr) return '—';
     const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '—';
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   };
 
   const pickImage = async () => {
     const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permResult.granted) {
-      Toast.show({ type: 'error', title: 'Error', message: 'Photo library access is required' });
+      Toast.show({
+        type: 'error',
+        title: 'Cần quyền truy cập',
+        message: 'Vui lòng cho phép truy cập thư viện ảnh để đổi ảnh đại diện',
+      });
       return;
     }
 
@@ -62,7 +79,7 @@ export default function EditProfileScreen({ navigation }: any) {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.85,
     });
 
     if (!result.canceled && result.assets[0]) {
@@ -70,13 +87,17 @@ export default function EditProfileScreen({ navigation }: any) {
       setUploading(true);
       try {
         const uploadResult = await profileService.uploadAvatar(uri);
-        const newAvatarUrl = `${API_BASE_URL}${uploadResult.result.avatar}`;
-        setAvatarUri(newAvatarUrl);
-        Toast.show({ type: 'success', title: 'Success', message: 'Avatar updated successfully' });
+        const path = uploadResult?.result?.avatar;
+        if (path) {
+          setAvatarRaw(path);
+          setAvatarCacheBust((n) => n + 1);
+        }
+        Toast.show({ type: 'success', title: 'Thành công', message: 'Đã cập nhật ảnh đại diện' });
       } catch (error: any) {
         Toast.show({
-          type: 'error', title: 'Error',
-          message: error.response?.data?.message || 'Avatar upload failed',
+          type: 'error',
+          title: 'Lỗi tải ảnh',
+          message: error.response?.data?.message || 'Không upload được ảnh. Thử lại sau.',
         });
       } finally {
         setUploading(false);
@@ -86,108 +107,94 @@ export default function EditProfileScreen({ navigation }: any) {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Toast.show({ type: 'error', title: 'Error', message: 'Name cannot be empty' });
+      Toast.show({ type: 'error', title: 'Thiếu thông tin', message: 'Họ tên không được để trống' });
       return;
     }
     setSaving(true);
     try {
       await profileService.updateProfile({ name: name.trim() });
-      Toast.show({ type: 'success', title: 'Success', message: 'Profile updated successfully' });
+      Toast.show({ type: 'success', title: 'Đã lưu', message: 'Cập nhật hồ sơ thành công' });
       navigation.goBack();
     } catch (error: any) {
       Toast.show({
-        type: 'error', title: 'Error',
-        message: error.response?.data?.message || 'Failed to update profile',
+        type: 'error',
+        title: 'Lỗi',
+        message: error.response?.data?.message || 'Không lưu được hồ sơ',
       });
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  if (!bootstrapped) {
     return (
-      <SafeAreaView className="flex-1 justify-center items-center" style={{ backgroundColor: '#FFF8E7' }}>
+      <SafeAreaView className="flex-1 items-center justify-center" style={{ backgroundColor: SCREEN_BG }}>
         <ActivityIndicator size="large" color={ACCENT} />
+        <Text className="mt-3 text-gray-500">Đang tải...</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FFF8E7' }}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-        <ScrollView className="flex-1" contentContainerClassName="px-6 py-4" keyboardShouldPersistTaps="handled">
-
-          {/* Header */}
-          <View className="flex-row items-center mb-6">
-            <TouchableOpacity onPress={() => navigation.goBack()} className="mr-4">
-              <Ionicons name="arrow-back" size={24} color={ACCENT} />
+    <SafeAreaView className="flex-1" style={{ backgroundColor: SCREEN_BG }} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+        <ScrollView
+          className="flex-1"
+          contentContainerClassName="px-5 pb-10 pt-2"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="mb-6 flex-row items-center">
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              className="mr-3 h-11 w-11 items-center justify-center rounded-full"
+              style={{ backgroundColor: '#FEF3C7' }}
+            >
+              <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </TouchableOpacity>
-            <Text className="text-2xl font-bold" style={{ color: ACCENT }}>Personal Information</Text>
+            <View className="flex-1">
+              <Text className="text-lg font-bold text-gray-900">Chỉnh sửa hồ sơ</Text>
+              <Text className="text-xs text-gray-500">Cập nhật tên và ảnh đại diện</Text>
+            </View>
           </View>
 
-          {/* Avatar + Upload */}
-          <View className="items-center mb-8">
-            <TouchableOpacity onPress={pickImage} activeOpacity={0.8} disabled={uploading}>
-              <View
-                className="rounded-full items-center justify-center"
-                style={{
-                  width: 120, height: 120,
-                  borderWidth: 3, borderColor: ACCENT,
-                  backgroundColor: '#fff',
-                }}
-              >
-                {avatarUri ? (
-                  <Image
-                    source={{ uri: avatarUri }}
-                    className="rounded-full"
-                    style={{ width: 110, height: 110 }}
-                  />
-                ) : (
-                  <LinearGradient
-                    colors={['#D97706', '#92400E']}
-                    className="rounded-full items-center justify-center"
-                    style={{ width: 110, height: 110 }}
-                  >
-                    <Text className="text-white text-4xl font-bold">
-                      {name?.charAt(0)?.toUpperCase() || '?'}
-                    </Text>
-                  </LinearGradient>
-                )}
-
-                {/* Camera overlay */}
-                <View
-                  className="absolute items-center justify-center rounded-full"
-                  style={{
-                    bottom: 0, right: 0,
-                    width: 36, height: 36,
-                    backgroundColor: ACCENT,
-                    borderWidth: 3, borderColor: '#FFF8E7',
-                  }}
-                >
-                  {uploading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons name="camera" size={16} color="#fff" />
-                  )}
-                </View>
-              </View>
-            </TouchableOpacity>
-            <Text className="text-xs text-gray-400 mt-3">Tap to change your avatar</Text>
+          <View className="mb-8 items-center">
+            <ProfileUserAvatar
+              name={name}
+              avatarRaw={avatarRaw}
+              size={110}
+              borderWidth={5}
+              editable
+              uploading={uploading}
+              onPress={pickImage}
+              cacheBust={avatarCacheBust}
+              badgeBorderColor={SCREEN_BG}
+            />
+            <Text className="mt-3 text-center text-xs text-gray-500">
+              Chạm vào ảnh để đổi ảnh đại diện
+            </Text>
           </View>
 
-          {/* Form fields in card */}
-          <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm">
-            {/* Name (editable) */}
+          <View
+            className="mb-6 rounded-2xl bg-white p-5"
+            style={{
+              shadowColor: '#78350F',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              elevation: 3,
+            }}
+          >
             <View className="mb-6">
-              <Text className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Full Name</Text>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Họ và tên</Text>
               <View
                 className="flex-row items-center gap-3 pb-2"
                 style={{ borderBottomWidth: 1.5, borderBottomColor: nameFocused ? ACCENT : '#F3F4F6' }}
               >
-                <Ionicons name="person-outline" size={18} color={nameFocused ? ACCENT : '#B0B0B0'} />
+                <Ionicons name="person-outline" size={20} color={nameFocused ? ACCENT : '#B0B0B0'} />
                 <TextInput
-                  className="flex-1 text-base text-gray-800 p-0"
-                  placeholder="Enter your name"
+                  className="flex-1 p-0 text-base text-gray-900"
+                  placeholder="Nhập họ tên"
                   placeholderTextColor="#B0B0B0"
                   value={name}
                   onChangeText={setName}
@@ -197,61 +204,59 @@ export default function EditProfileScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* Email (read-only) */}
             <ReadOnlyField icon="mail-outline" label="Email" value={email} />
+            <ReadOnlyField icon="shield-outline" label="Vai trò" value={getRoleLabel(role)} />
+            <ReadOnlyField icon="calendar-outline" label="Ngày tham gia" value={formatDate(createdAt)} />
 
-            {/* Role (read-only) */}
-            <ReadOnlyField icon="shield-outline" label="Role" value={getRoleLabel(role)} />
-
-            {/* Created At (read-only) */}
-            <ReadOnlyField icon="calendar-outline" label="Joined Date" value={formatDate(createdAt)} />
-
-            {/* Verified (read-only) */}
-            <View className="mb-2">
-              <Text className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Status</Text>
-              <View className="flex-row items-center gap-3 pb-2 border-b border-gray-50">
+            <View className="mb-1">
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Trạng thái</Text>
+              <View className="flex-row items-center gap-3 border-b border-gray-100 pb-2">
                 <Ionicons
                   name={isVerified ? 'checkmark-circle' : 'close-circle'}
-                  size={18}
+                  size={20}
                   color={isVerified ? '#16A34A' : '#DC2626'}
                 />
                 <Text
-                  className="flex-1 text-base font-medium"
+                  className="flex-1 text-base font-semibold"
                   style={{ color: isVerified ? '#16A34A' : '#DC2626' }}
                 >
-                  {isVerified ? 'Verified' : 'Unverified'}
+                  {isVerified ? 'Đã xác minh' : 'Chưa xác minh'}
                 </Text>
               </View>
             </View>
           </View>
 
-          {/* Save button */}
-          <TouchableOpacity onPress={handleSave} activeOpacity={0.85} disabled={saving} className="mb-8">
-            <LinearGradient
-              colors={['#B45309', '#92400E', '#78350F']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              className="rounded-full py-4 items-center"
-            >
-              {saving ? <ActivityIndicator color="#fff" /> : (
-                <Text className="text-white text-base font-extrabold tracking-widest">SAVE CHANGES</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-
+          <View className="mt-1">
+            <ProfilePrimaryButton
+              label="Lưu thay đổi"
+              icon="checkmark-circle"
+              onPress={handleSave}
+              loading={saving}
+              disabled={saving}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-function ReadOnlyField({ icon, label, value }: { icon: any; label: string; value: string }) {
+function ReadOnlyField({
+  icon,
+  label,
+  value,
+}: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: string;
+}) {
   return (
     <View className="mb-6">
-      <Text className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{label}</Text>
-      <View className="flex-row items-center gap-3 pb-2 border-b border-gray-50">
-        <Ionicons name={icon} size={18} color="#B0B0B0" />
-        <Text className="flex-1 text-base text-gray-400">{value}</Text>
-        <Ionicons name="lock-closed" size={12} color="#D1D5DB" />
+      <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</Text>
+      <View className="flex-row items-center gap-3 border-b border-gray-100 pb-2">
+        <Ionicons name={icon} size={20} color="#B0B0B0" />
+        <Text className="flex-1 text-base text-gray-600">{value || '—'}</Text>
+        <Ionicons name="lock-closed" size={14} color="#D1D5DB" />
       </View>
     </View>
   );
@@ -259,9 +264,13 @@ function ReadOnlyField({ icon, label, value }: { icon: any; label: string; value
 
 function getRoleLabel(role: string): string {
   switch (role) {
-    case 'admin': return 'Administrator';
-    case 'employer': return 'Employer';
-    case 'customer': return 'Customer';
-    default: return role;
+    case 'admin':
+      return 'Quản trị viên';
+    case 'employer':
+      return 'Nhà tuyển dụng';
+    case 'customer':
+      return 'Khách hàng';
+    default:
+      return role || '—';
   }
 }

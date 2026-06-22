@@ -8,6 +8,9 @@ import type { ComponentProps } from 'react';
 import { useCallback, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { decodeJwtRole } from '@/api/adminApi';
+import { getUnreadCount as getChatUnreadCount } from '@/services/chat.service';
+import { getUnreadCount as getNotificationUnreadCount } from '@/services/notification.service';
+import { connectSocket } from '@/services/socket';
 
 type UserRoute = keyof Pick<
   RootStackParamList,
@@ -46,6 +49,8 @@ export default function UserBottomBar({
 }) {
   const insets = useSafeAreaInsets();
   const [role, setRole] = useState<UserRole>('guest');
+  const [chatUnread, setChatUnread] = useState(0);
+  const [notificationUnread, setNotificationUnread] = useState(0);
   const bottomPad = Math.max(insets.bottom, 10);
   const height = TAB_H + bottomPad;
 
@@ -63,6 +68,40 @@ export default function UserBottomBar({
           setRole('guest');
         }
       });
+
+      let mounted = true;
+      const refreshUnread = async () => {
+        try {
+          const [chatCount, notificationCount] = await Promise.all([
+            getChatUnreadCount(),
+            getNotificationUnreadCount(),
+          ]);
+          if (!mounted) return;
+          setChatUnread(chatCount);
+          setNotificationUnread(notificationCount);
+        } catch {
+          // Keep previous badge values when API is unavailable.
+        }
+      };
+      void refreshUnread();
+
+      let offSocket: (() => void) | null = null;
+      void connectSocket().then((socket) => {
+        if (!mounted) return;
+        const onNewMessage = () => setChatUnread((c) => c + 1);
+        const onNotification = () => setNotificationUnread((c) => c + 1);
+        socket.on('new_message', onNewMessage);
+        socket.on('notification', onNotification);
+        offSocket = () => {
+          socket.off('new_message', onNewMessage);
+          socket.off('notification', onNotification);
+        };
+      });
+
+      return () => {
+        mounted = false;
+        offSocket?.();
+      };
     }, []),
   );
 
@@ -96,6 +135,20 @@ export default function UserBottomBar({
                 size={20}
                 color={isActive ? COLORS.primaryDark : COLORS.textMuted}
               />
+              {r === 'Messages' && chatUnread > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {chatUnread > 9 ? '9+' : String(chatUnread)}
+                  </Text>
+                </View>
+              )}
+              {r === 'Notifications' && notificationUnread > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {notificationUnread > 9 ? '9+' : String(notificationUnread)}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{LABELS[r]}</Text>
           </TouchableOpacity>
@@ -130,8 +183,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
+    position: 'relative',
   },
   tabIconBoxActive: { backgroundColor: COLORS.primaryLight },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: COLORS.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   tabLabel: { fontSize: 9, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.2 },
   tabLabelActive: { color: COLORS.primaryDark },
 });

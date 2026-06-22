@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 import type { Socket } from 'socket.io-client';
 import MessageBubble from '../components/MessageBubble';
 import Avatar from '../components/Avatar';
@@ -32,12 +33,53 @@ type Props = {
 
 
 function extractSenderId(senderId: unknown): string {
-  if (typeof senderId === 'string') return senderId;
-  if (senderId && typeof senderId === 'object') {
-    const o = senderId as Record<string, unknown>;
-    return String(o['_id'] ?? o['id'] ?? '');
+  const normalize = (value: unknown): string => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'object') {
+      const o = value as Record<string, unknown>;
+      if (typeof o['$oid'] === 'string') return o['$oid'];
+      if (typeof (value as { toString?: () => string }).toString === 'function') {
+        const s = (value as { toString: () => string }).toString();
+        if (s && s !== '[object Object]') return s;
+      }
+      return normalize(o['_id'] ?? o['id']);
+    }
+    return '';
+  };
+  return normalize(senderId);
+}
+
+function normalizeId(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    if (typeof o['$oid'] === 'string') return o['$oid'];
+    if (o['_id'] != null) return normalizeId(o['_id']);
+    if (o['id'] != null) return normalizeId(o['id']);
+    if (typeof (value as { toString?: () => string }).toString === 'function') {
+      const s = (value as { toString: () => string }).toString();
+      if (s && s !== '[object Object]') return s;
+    }
   }
   return '';
+}
+
+function decodeJwtUserId(token: string): string {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return '';
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json = globalThis.atob(padded);
+    const decoded = JSON.parse(json) as { _id?: unknown; id?: unknown; sub?: unknown };
+    return normalizeId(decoded._id ?? decoded.id ?? decoded.sub);
+  } catch {
+    return '';
+  }
 }
 
 function formatTime(iso: string): string {
@@ -85,6 +127,16 @@ function buildChatItems(messages: Message[]): ChatItem[] {
   return items;
 }
 
+function toEpoch(value?: string): number {
+  if (!value) return 0;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+function sortMessagesAsc(items: Message[]): Message[] {
+  return [...items].sort((a, b) => toEpoch(a.createdAt) - toEpoch(b.createdAt));
+}
+
 
 export default function ChatScreen({ navigation, route }: Props) {
   const { conversationId, recipientName, recipientId } = route.params;
@@ -92,6 +144,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [me, setMe] = useState<User | null>(null);
+  const [jwtUserId, setJwtUserId] = useState('');
   const [loading, setLoading] = useState(true);
   const [typing, setTyping] = useState(false);
   const [isRecipientOnline, setIsRecipientOnline] = useState(false);
@@ -108,7 +161,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const load = useCallback(async () => {
     try {
       const [msgs, user] = await Promise.all([getMessages(conversationId), getStoredUser()]);
-      setMessages(msgs);
+      setMessages(sortMessagesAsc(msgs));
       setMe(user);
     } catch (e) {
       console.error('[ChatScreen] Lỗi tải tin nhắn:', JSON.stringify(e));
@@ -148,7 +201,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         if (msgCid === conversationId) {
           setMessages((prev) => {
             if (prev.some((m) => m._id === msg._id)) return prev;
-            return [...prev, msg];
+            return sortMessagesAsc([...prev, msg]);
           });
           scrollToBottom();
           void markRead(conversationId).catch(() => null);
@@ -187,6 +240,17 @@ export default function ChatScreen({ navigation, route }: Props) {
       scrollToBottom();
     });
   }, [load, scrollToBottom]);
+
+  useEffect(() => {
+    let mounted = true;
+    void SecureStore.getItemAsync('accessToken').then((token) => {
+      if (!mounted) return;
+      setJwtUserId(token ? decodeJwtUserId(token) : '');
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const sendMessage = async () => {
     const content = text.trim();
@@ -246,7 +310,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     }
   };
 
-  const myId = me?.id ?? me?._id ?? '';
+  const myIds = new Set([normalizeId(me?.id), normalizeId(me?._id), normalizeId(jwtUserId)].filter(Boolean));
   const chatItems = buildChatItems(messages);
 
   const renderItem = ({ item }: { item: ChatItem }) => {
@@ -257,7 +321,8 @@ export default function ChatScreen({ navigation, route }: Props) {
         </View>
       );
     }
-    const isMine = extractSenderId(item.data.senderId) === myId;
+    const senderId = extractSenderId(item.data.senderId);
+    const isMine = senderId !== '' && myIds.has(senderId);
     return <MessageBubble message={item.data} isMine={isMine} />;
   };
 

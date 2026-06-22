@@ -52,7 +52,7 @@ apiClient.interceptors.response.use(
     const reqUrl = String(originalRequest.url ?? '');
     // Không refresh khi lỗi từ login/register/forgot — 401 ở đây là sai mật khẩu / chưa verify, không phải access token hết hạn
     const isPublicAuthFailure =
-      /\/auth\/(login|register|forgot-password|verify-otp|reset-password)(\?|$)/.test(reqUrl);
+      /\/auth\/(login|register|forgot-password|verify-otp|reset-password|google-token)(\?|$)/.test(reqUrl);
 
     // Only retry once, and don't retry for refresh-token or public auth endpoints
     if (
